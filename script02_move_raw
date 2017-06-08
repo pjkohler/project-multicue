@@ -1,0 +1,16 @@
+#!/bin/bash
+
+export CUR_DIR=${PWD}
+export TOP_DIR=/Volumes/Denali_MRI/kohler/fMRI_EXP/MULTIFOVEA
+
+cd ${TOP_DIR}
+
+SUBFOLDERS=(`ls -d 201608*`)
+echo ${SUBFOLDERS[@]}
+
+for FULL_DIR in ${SUBFOLDERS[@]}
+	do
+	mkdir /Volumes/svndl/kohler/MULTIFOVEA/RAW_DATA/${FULL_DIR}
+	rsync -auv ${TOP_DIR}/${FULL_DIR}/raw_data /Volumes/svndl/kohler/MULTIFOVEA/RAW_DATA/${FULL_DIR}
+	rm -r ${TOP_DIR}/${FULL_DIR}/raw_data
+done

@@ -1,10 +1,10 @@
-# project-multifovea
+# project-multicue
 
-Code for analyzing fMRI data for the multifovea project
+Code for analyzing fMRI data for the multicue project
 
 Developed and maintained by Peter J. Kohler.
 
 Dependencies:
 * http://github.com/svndl/mrC.git
-* http://github.com/svndl/rcaBase.git
+* http://github.com/pjkohler/MRI.git
 

@@ -1,0 +1,29 @@
+#!/bin/bash
+
+export CUR_DIR=${PWD}
+export TOP_DIR=/Volumes/Denali_MRI/kohler/fMRI_EXP/MULTIFOVEA
+
+cd ${TOP_DIR}
+
+SUBFOLDERS=(`ls -d *nl-0040*`)
+echo ${SUBFOLDERS[@]}
+
+for FULL_DIR in ${SUBFOLDERS[@]}
+do
+	cd ${TOP_DIR}
+	[ -d "${FULL_DIR}" ] || continue
+	cd ${FULL_DIR}/SURF
+	SUB=${FULL_DIR##*_}
+	if [ "${SUB}" = "nl-0033" ]
+		then
+		export SUB='skeri0003'
+	fi
+	pkVOL2SURF -mf ave -sv ../${SUB}_fs4_SurfVol_Alnd_Exp+orig. -s ${SUB} CONT_signal.nii.gz
+	pkVOL2SURF -mf ave -sv ../${SUB}_fs4_SurfVol_Alnd_Exp+orig. -s ${SUB} MOFO_signal.nii.gz
+	if [ -f "DISP_signal.nii.gz" ]
+		then
+		pkVOL2SURF -mf ave -sv ../${SUB}_fs4_SurfVol_Alnd_Exp+orig. -s ${SUB} DISP_signal.nii.gz
+	fi
+done
+
+cd ${CUR_DIR}

@@ -1,0 +1,47 @@
+#!/bin/bash
+
+export CUR_DIR=${PWD}
+
+export EXP_FOLDER=/Volumes/Denali_MRI/kohler/fMRI_EXP/MULTIFOVEA
+export SUBJECTS_DIR=/Volumes/svndl/anatomy/FREESURFER_SUBS
+
+cd ${EXP_FOLDER}
+
+export cov='3mm'
+
+for SUBJ in $(ls -d 201608* )
+do
+
+	if  [ $SUBJ = "20150506_nl-0033" ];then
+		subname="skeri0003"
+	else
+		subname=${SUBJ#*_}
+	fi
+
+	for hemi in rh lh
+		do
+			# FOVEA
+			cd ${EXP_FOLDER}/${SUBJ}/SURF
+			rm ${EXP_FOLDER}/${SUBJ}/ROIs/${hemi}.fovea_${cov}*
+			pkSURF2VOL -s ${subname} \
+					   -o ${EXP_FOLDER}/${SUBJ}/ROIs \
+					   -sv ${EXP_FOLDER}/${SUBJ}/${subname}_fs4_SurfVol_Alnd_Exp+orig \
+					   -mf mode ${hemi}.fovea_${cov}.niml.dset
+
+			cd ${EXP_FOLDER}/${SUBJ}/ROIs
+
+			3dresample -master ${EXP_FOLDER}/${SUBJ}/refEpi.ts.do.vr.nii.gz -prefix ${hemi}.fovea_${cov}_rs.nii.gz -inset ${hemi}.fovea_${cov}+orig
+			
+			if [ ${hemi} = lh ]; then
+				rm ${subname}_fovea_${cov}_al_mask.nii*
+	   		    3dcalc -a lh.fovea_${cov}_rs.nii.gz -b rh.fovea_${cov}_rs.nii.gz \
+	   				-expr 'iszero(and(a,b))*(a+b)' -prefix ${subname}_fovea_${cov}_al_mask.nii.gz
+			fi
+	done
+
+done
+
+cd ${CUR_DIR}	
+	
+	
+	 

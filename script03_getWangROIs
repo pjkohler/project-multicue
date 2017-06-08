@@ -1,0 +1,92 @@
+#!/bin/bash
+
+export CUR_DIR=${PWD}
+
+export EXP_FOLDER=/Volumes/Denali_MRI/kohler/fMRI_EXP/MULTIFOVEA
+export SUBJECTS_DIR=/Volumes/svndl/anatomy/FREESURFER_SUBS
+
+cd ${EXP_FOLDER}
+
+for SUBJ in $(ls -d *nl-0040* )
+do
+
+	if  [ $SUBJ = "20150506_nl-0033" ];then
+		subname="skeri0003"
+	else
+		subname=${SUBJ#*_}
+	fi
+
+	#do surface
+	cd ${EXP_FOLDER}/${SUBJ}
+
+	if [ -f ${EXP_FOLDER}/${SUBJ}/refAnat_fp_al+orig.HEAD ]
+		then
+		refAnat='refAnat_fp_al'
+	else
+		refAnat='refAnat_al'
+	fi
+	
+	if [ ! -f ${EXP_FOLDER}/${SUBJ}/${subname}_fs4_SurfVol_Alnd_Exp+orig.HEAD ]
+		then
+		@SUMA_AlignToExperiment -align_centers -overwrite_resp O \
+ 							-surf_anat ${SUBJECTS_DIR}/${subname}_fs4/SUMA/${subname}_fs4_SurfVol+orig. \
+							-exp_anat ${EXP_FOLDER}/${SUBJ}/${refAnat}+orig. -prefix ${EXP_FOLDER}/${SUBJ}/${subname}_fs4_SurfVol_Alnd_Exp+orig. -strip_skull surf_anat
+	fi
+
+	#create a mask
+	if [ ! -d ${EXP_FOLDER}/${SUBJ}/ROIs ]
+		then
+		mkdir ${EXP_FOLDER}/${SUBJ}/ROIs
+	fi
+
+	cd ${EXP_FOLDER}/${SUBJ}/ROIs
+	
+	if [ -f ${EXP_FOLDER}/${SUBJ}/ROIs/${refAnat}+orig.HEAD ]
+		then
+		rm ${refAnat}+orig*
+	fi
+	
+	3dcopy ../${refAnat}+orig .
+	cp ../refEpi* .
+
+	rm ${EXP_FOLDER}/${SUBJ}/ROIs/${subname}_mask.nii.gz
+	3dAutomask -prefix ${EXP_FOLDER}/${SUBJ}/ROIs/${subname}_mask.nii.gz ${EXP_FOLDER}/${SUBJ}/refEpi.ts.do.vr.nii.gz
+
+	#clean up 
+
+	for hemi in rh lh
+		do
+			# WANG
+			cd ${SUBJECTS_DIR}/${subname}_fs4/WangAtlas
+			rm ${EXP_FOLDER}/${SUBJ}/ROIs/${hemi}.wangatlas*
+			pkSURF2VOL -s ${subname} \
+					   -o ${EXP_FOLDER}/${SUBJ}/ROIs \
+					   -sv ${EXP_FOLDER}/${SUBJ}/${subname}_fs4_SurfVol_Alnd_Exp+orig \
+					   -mf mode ${hemi}.wangatlas_ready.niml.dset
+			
+			# BENSON
+			cd ${SUBJECTS_DIR}/${subname}_fs4/bensonModel
+			rm ${EXP_FOLDER}/${SUBJ}/ROIs/${hemi}.eccen.V1-V3model*
+			pkSURF2VOL -s ${subname} \
+					   -o ${EXP_FOLDER}/${SUBJ}/ROIs \
+					   -sv ${EXP_FOLDER}/${SUBJ}/${subname}_fs4_SurfVol_Alnd_Exp+orig \
+					   -mf ave ${hemi}.eccen.V1-V3model.niml.dset
+
+			cd ${EXP_FOLDER}/${SUBJ}/ROIs
+
+			3dresample -master ${EXP_FOLDER}/${SUBJ}/refEpi.ts.do.vr.nii.gz -prefix ${hemi}.wangatlas_rs.nii.gz -inset ${hemi}.wangatlas_ready+orig
+			3dresample -master ${EXP_FOLDER}/${SUBJ}/refEpi.ts.do.vr.nii.gz -prefix ${hemi}.eccen.V1-V3model_rs.nii.gz -inset ${hemi}.eccen.V1-V3model+orig
+			
+			if [ ${hemi} = lh ]; then
+				rm ${subname}_eccen.V1-V3model_al_mask.nii*
+	   		    3dcalc -a lh.eccen.V1-V3model_rs.nii.gz -b rh.eccen.V1-V3model_rs.nii.gz \
+	   				-expr 'iszero(and(a,b))*(a+b)' -prefix ${subname}_eccen.V1-V3model_al_mask.nii.gz
+			fi
+	done
+
+done
+
+cd ${CUR_DIR}	
+	
+	
+	 

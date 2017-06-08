@@ -1,0 +1,74 @@
+#!/bin/bash
+
+export CUR_DIR=${PWD}
+export TOP_DIR=/Volumes/Denali_MRI/kohler/fMRI_EXP/MULTIFOVEA
+
+cd ${TOP_DIR}
+
+SUBFOLDERS=(`ls -d *nl-0040*`)
+echo ${SUBFOLDERS[@]}
+
+export SUFFIX='vr.sc.dt'
+
+for FULL_DIR in ${SUBFOLDERS[@]}
+do
+	cd ${TOP_DIR}
+	[ -d "${FULL_DIR}" ] || continue
+	cd ${FULL_DIR}
+	SUB=${FULL_DIR##*_}
+	if [ "${SUB}" = "nl-0033" ]
+		then
+		export SUB='skeri0003'
+	fi
+
+	# DO CONT
+	export CONTOUT=(`ls -f *run*cont*.niml.dset`)
+	if [ -z ${CONTOUT} ]
+		then
+		pkVOL2SURF -mf ave -sv ${SUB}_fs4_SurfVol_Alnd_Exp+orig. -s ${SUB} -std run*cont*.nii.gz
+	fi
+	export CONTSMOOTHOUT=(`ls -f *run*cont*3fwhm*.niml.dset`)
+	if [ -z ${CONTSMOOTHOUT} ]
+		then
+		export CONTFILES=(`ls -f *run*cont*.nii.gz`)
+		pkSURFSMOOTH -bs 3 -s ${SUB} -std ${CONTFILES[@]%%.nii.gz}
+	fi
+
+	# DO MOFO
+	export MOFOOUT=(`ls -f *run*mofo*.niml.dset`)
+	if [ -z ${MOFOOUT} ]
+		then
+		pkVOL2SURF -mf ave -sv ${SUB}_fs4_SurfVol_Alnd_Exp+orig. -s ${SUB} -std run*mofo*.nii.gz
+	fi
+	export MOFOSMOOTHOUT=(`ls -f *run*mofo*3fwhm*.niml.dset`)
+	if [ -z ${MOFOSMOOTHOUT} ]
+		then
+		export MOFOFILES=(`ls -f run*mofo*.nii.gz`)
+		pkSURFSMOOTH -bs 3 -s ${SUB} -std ${MOFOFILES[@]%%.nii.gz}
+	fi
+
+	export DISPFILES=(`ls -f run*disp*.nii.gz`)
+	if [ ! -z ${DISPFILES} ]
+		then
+		export DISPOUT=(`ls -f *run*disp*.niml.dset`)
+		if [ -z ${DISPOUT} ]
+		then
+			pkVOL2SURF -mf ave -sv ${SUB}_fs4_SurfVol_Alnd_Exp+orig. -s ${SUB} -std run*disp*.nii.gz
+		fi
+		export DISPSMOOTHOUT=(`ls -f *run*disp*3fwhm*.niml.dset`)
+		if [ -z ${DISPSMOOTHOUT} ]
+			then
+			pkSURFSMOOTH -bs 3 -s ${SUB} -std ${DISPFILES[@]%%.nii.gz}
+		fi
+	fi
+
+	# now move files
+	if [ ! -d "${FULL_DIR}/SURF" ]; then
+		mkdir ${FULL_DIR}/SURF
+	fi
+	if [ ! -d "${FULL_DIR}/SURF/run_surf" ]; then
+		mkdir ${FULL_DIR}/SURF
+	fi
+	mv *run*niml.dset* ${FULL_DIR}/SURF/run_surf/.
+
+done
