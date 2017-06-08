@@ -1,6 +1,6 @@
 clear all
 close all
-codeFolder = 'Users/kohler/code';
+codeFolder = '/Users/kohler/code';
 addpath(genpath([codeFolder,'/git/schlegel/matlab_lib']));
 addpath(genpath([codeFolder,'/git/mrC']));
 addpath(genpath([codeFolder,'/git/MRI/matlab']));
