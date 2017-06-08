@@ -13,7 +13,7 @@ plotROIs = false;
 suffix = 'vr.sc.dt';
 
 topFolder = '/Volumes/Denali_MRI/kohler/fMRI_EXP/MULTIFOVEA';%'/Users/kohler/Dropbox/PRESENTATIONS/2016/FENS_2016'
-figFolder = '/Volumes/Denali_MRI/kohler/fMRI_EXP/MULTIFOVEA/scripts/figures';
+figFolder = '/Volumes/Denali_MRI/kohler/fMRI_EXP/MULTIFOVEA/figures';
 
 subjFolders = subfolders([topFolder,'/201*'],1);
 
@@ -23,9 +23,9 @@ benoitSubj = cell2mat(cellfun(@(x) ~isempty(strfind(x,'CS_DISP')),subjFolders,'u
 
 subCount = [length(subjFolders),sum(~benoitSubj),sum(benoitSubj)]; % all, mine, benoit
 
-saveName = [num2str(subCount(1)),'sub_',suffix,'.mat'];
-ringSave = ['ring_',num2str(subCount(1)),'sub_',suffix,'.mat'];
-foveaSave = ['fovea_',num2str(subCount(1)),'sub_',suffix,'.mat'];
+saveName = [figFolder,'/',num2str(subCount(1)),'sub_',suffix,'.mat'];
+ringSave = [figFolder,'/ring_',num2str(subCount(1)),'sub_',suffix,'.mat'];
+foveaSave = [figFolder,'/fovea_',num2str(subCount(1)),'sub_',suffix,'.mat'];
 
 nCycles = 10;
 nHarm = 5;
