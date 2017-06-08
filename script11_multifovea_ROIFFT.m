@@ -13,6 +13,8 @@ plotROIs = false;
 suffix = 'vr.sc.dt';
 
 topFolder = '/Volumes/Denali_MRI/kohler/fMRI_EXP/MULTIFOVEA';%'/Users/kohler/Dropbox/PRESENTATIONS/2016/FENS_2016'
+figFolder = '/Volumes/Denali_MRI/kohler/fMRI_EXP/MULTIFOVEA/scripts/figures';
+
 subjFolders = subfolders([topFolder,'/201*'],1);
 
 benoitFolder = '/Volumes/Denali_4D2/kohler/fMRI_EXP/CS_DISP';
@@ -605,9 +607,9 @@ if plotROIs
                 drawnow;
                 tightfig;
                 if p==1
-                    figName = ['../figures/',roiSelection{r},'.',suffix];
+                    figName = [figFolder,'/',roiSelection{r},'.',suffix];
                 else
-                    figName = ['../figures/benoit_',roiSelection{r},'.',suffix];
+                    figName = [figFolder,'/benoit_',roiSelection{r},'.',suffix];
                 end
                 export_fig([figName,'.pdf'],'-pdf','-transparent',gcf),
             else
@@ -690,25 +692,25 @@ close all;
 %                     figure(bothFig); subplot(1,4,plotCount); hold on;
 %                     plotLabel = ' ';
 %                     plotSize = [1.5,.75];
-%                     figName = ['../figures/bothSNR_harm',num2str(whichHarm),'.',suffix];
+%                     figName = [figFolder,'/bothSNR_harm',num2str(whichHarm),'.',suffix];
 %                 case 2 % plot left and right
 %                     figure(lrFig); 
 %                     subplot(2,4,plotCount); hold on;
 %                     plotLabel = 'LH';
 %                     plotSize = [1.5,1.5];
-%                     figName = ['../figures/hemiSNR_harm',num2str(whichHarm),'.',suffix];
+%                     figName = [figFolder,'/hemiSNR_harm',num2str(whichHarm),'.',suffix];
 %                 case 3
 %                     figure(lrFig); 
 %                     subplot(2,4,plotCount+4); hold on;
 %                     plotLabel = 'RH';
 %                     plotSize = [1.5,1.5];
-%                     figName = ['../figures/hemiSNR_harm',num2str(whichHarm),'.',suffix];
+%                     figName = [figFolder,'/hemiSNR_harm',num2str(whichHarm),'.',suffix];
 %                 otherwise
 %                     figure(EVCfig);
 %                     subplot(2,2,plotType-3); hold on;
 %                     plotLabel = evcLabels(plotType-3);
 %                     plotSize = [1.5,1.5];
-%                     figName = ['../figures/evcSNR_harm',num2str(whichHarm),'.',suffix];
+%                     figName = [figFolder,'/evcSNR_harm',num2str(whichHarm),'.',suffix];
 %             end
 %             if vecPlot
 %                 snrPlot(r) = plot(xAxis,partVecAmp{plotType}(r,:),'o-','LineWidth',2,'color',roiColors(r,:));
@@ -982,9 +984,9 @@ for p = 1:2
     newPos(4) = figWidth(2);
     set(gcf, 'pos',newPos);
     if p ==1
-        figName = '../figures/simplePlot';
+        figName = [figFolder,'/simplePlot'];
     else
-        figName = '../figures/simplePlot_benoit';
+        figName = [figFolder,'/simplePlot_benoit'];
     end
     %export_fig([figName,'.pdf'],'-pdf','-transparent',simpFig(p));
     hold off
@@ -1022,7 +1024,7 @@ for c=1:(length(condNames)-1)
         yMin = -3;
         yUnit = 1;
         figure(1);
-        figName = '../figures/ringROI';
+        figName = [figFolder,'/ringROI'];
     elseif c<4
         yMax = 0.4;
         yMin = -0.4;
@@ -1030,7 +1032,7 @@ for c=1:(length(condNames)-1)
     else
         if c==4
             figure(2);
-            figName = '../figures/ringROI_benoit';
+            figName = [figFolder,'/ringROI_benoit'];
             plotCount = 0;
         else
         end
@@ -1134,11 +1136,11 @@ for r=1:length(evcROIs)
     for c=1:numConds
          if c==1
             figure(1);
-            figName = '../figures/foveaROI';
+            figName = [figFolder,'/foveaROI'];
             plotCount = 0;
          elseif c==4
             figure(2);
-            figName = '../figures/foveaROI_benoit';
+            figName = [figFolder,'/foveaROI_benoit'];
             plotCount = 0;
          end
         plotCount = plotCount+1;
