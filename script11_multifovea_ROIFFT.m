@@ -3,13 +3,13 @@ function script11_multifovea_ROIFFT(varargin)
     % 
     % Syntax:	multifovea_ROIFFT(<options>)
     % <options>
-    %   loadFull    - logical indicating whether to run the full ROI
+    %   runFull    - logical indicating whether to run the full ROI
     %                   analysis (true), or load prior data ([false])
     %    
-    %   loadRing    - logical indicating whether to run the ring ROI
+    %   runRing    - logical indicating whether to run the ring ROI
     %                   analysis (true), or load prior data ([false])
     %
-    %   loadFovea    - logical indicating whether to run the fovea ROI
+    %   runFovea    - logical indicating whether to run the fovea ROI
     %                   analysis (true), or load prior data ([false])
     %
     %   plotROIs    - logical indicating whether or not to plot 
@@ -23,9 +23,9 @@ function script11_multifovea_ROIFFT(varargin)
     
     %% PARSE ARGS
     opt	= ParseArgs(varargin,...
-            'loadFull'		, false, ...
-            'loadRing', false, ...
-            'loadFovea', false, ...
+            'runFull'		, false, ...
+            'runRing', false, ...
+            'runFovea', false, ...
             'plotROIs', false ...
             );
 
@@ -63,7 +63,7 @@ function script11_multifovea_ROIFFT(varargin)
     myConds = {'cont','mofo','disp'};
     benoitConds = {'C1vsC2','C2vsC3','C1vsC3'};
 
-    if ~opt.loadFull
+    if opt.runFull
         roiFiles = '*wangatlas_al_mask.nii.gz';
         roiLabel = [cellfun(@(x) [x,'-L'],wangROIs,'uni',false),cellfun(@(x) [x,'-R'],wangROIs,'uni',false)];
         for s=1:subCount(1)
@@ -89,7 +89,7 @@ function script11_multifovea_ROIFFT(varargin)
     end
 
     %% RING ROIS
-    if ~opt.loadRing
+    if opt.runRing
         ringIncr = 0.25;
         ringSize = .5;
         ringMax = 6;
@@ -150,7 +150,7 @@ function script11_multifovea_ROIFFT(varargin)
 
     foveaTypes = {'inner','border','outer'};
 
-    if ~opt.loadFovea
+    if opt.runFovea
         wangFiles = '*wangatlas_al_mask.nii.gz';
         foveaFiles = '*fovea_3mm_al_mask.nii.gz';
         roiLabel = [cellfun(@(x) [x,'-L'],wangROIs,'uni',false),cellfun(@(x) [x,'-R'],wangROIs,'uni',false)];
