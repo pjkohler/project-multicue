@@ -119,19 +119,13 @@ function script11_multifovea_ROIFFT(varargin)
             for c=1:length(dataFiles)
                 if dataFiles{c}{1}
                     funcData = mean(mriReadBrainData(dataFiles{c}),5);
-
                     for r = 1:length(ringList)
-                        if r == 0 % include r = 0 to do whole thing
-                            curMin = 0;
-                            curMax = 6.25;
-                        else
-                            curMin = ringList(r)-(ringSize/2);
-                            curMax = ringList(r)+(ringSize/2);
-                        end
+                        curMin = ringList(r)-(ringSize/2);
+                        curMax = ringList(r)+(ringSize/2);
                         curNames = cellfun(@(x) [x,'ring',num2str(curMin),'-',num2str(curMax)],evcNames,'uni',false);
                         curRing = (ringData>curMin).*(ringData<=curMax);
                         curMask = cellfun(@(x) repmat(curRing.*ismember(wangData,x),1,1,1,nTR),evcIdx,'uni',false);
-                        [tmpResults(:,r+1)] = cell2mat(arrayfun(@(x) ...
+                        [tmpResults(:,r)] = cell2mat(arrayfun(@(x) ...
                             mriFFT(reshape(funcData(curMask{x}==1),length(find(curMask{x}==1))/nTR,nTR)',nCycles,nHarm,curNames{x}),...
                             1:3,'uni',false));
                     end
