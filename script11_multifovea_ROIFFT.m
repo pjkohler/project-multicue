@@ -12,6 +12,9 @@ function script11_multifovea_ROIFFT(varargin)
     %   runFovea    - logical indicating whether to run the fovea ROI
     %                   analysis (true), or load prior data ([false])
     %
+    %   processData    - logical indicating whether to run the process the ROI
+    %                   analysis (true), or load prior data ([false])
+    %
     %   plotROIs    - logical indicating whether or not to plot 
     %                   single ROI data [false]
     
@@ -23,17 +26,17 @@ function script11_multifovea_ROIFFT(varargin)
     
     %% PARSE ARGS
     opt	= ParseArgs(varargin,...
-            'runFull'		, false, ...
+            'runFull', false, ...
             'runRing', false, ...
             'runFovea', false, ...
+            'processData', false, ...
             'plotROIs', false ...
             );
-
+        
+    % assign folder names 
     suffix = 'vr.sc.dt';
-
-    topFolder = '/Volumes/Denali_MRI/kohler/fMRI_EXP/MULTIFOVEA';%'/Users/kohler/Dropbox/PRESENTATIONS/2016/FENS_2016'
+    topFolder = '/Volumes/Denali_MRI/kohler/fMRI_EXP/MULTIFOVEA';
     figFolder = '/Volumes/Denali_MRI/kohler/fMRI_EXP/MULTIFOVEA/figures';
-
     subjFolders = subfolders([topFolder,'/201*'],1);
 
     benoitFolder = '/Volumes/Denali_4D2/kohler/fMRI_EXP/CS_DISP';
@@ -41,488 +44,496 @@ function script11_multifovea_ROIFFT(varargin)
     benoitSubj = cell2mat(cellfun(@(x) ~isempty(strfind(x,'CS_DISP')),subjFolders,'uni',false));
 
     subCount = [length(subjFolders),sum(~benoitSubj),sum(benoitSubj)]; % all, mine, benoit
-
     savePath{1} = [figFolder,'/',num2str(subCount(1)),'sub_',suffix,'.mat'];
     savePath{2} = [figFolder,'/ring_',num2str(subCount(1)),'sub_',suffix,'.mat'];
     savePath{3} = [figFolder,'/fovea_',num2str(subCount(1)),'sub_',suffix,'.mat'];
+    savePath{4} = [figFolder,'/processed_',num2str(subCount(1)),'sub_',suffix,'.mat'];
+    
+    if opt.processData
+        
+        nCycles = 10;
+        nHarm = 5;
+        nTR = 120;
+        whichSNR = 2; % which SNR to use [1 = noisefloor within condition, 2=noisefloor across conditions]
+        whichHarm = 1; % which harmonic to use, usually 1
+        setenv('DYLD_LIBRARY_PATH','')
 
-    nCycles = 10;
-    nHarm = 5;
-    nTR = 120;
-    whichSNR = 2; % which SNR to use [1 = noisefloor within condition, 2=noisefloor across conditions]
-    whichHarm = 1; % which harmonic to use, usually 1
-    setenv('DYLD_LIBRARY_PATH','')
+        roiSelection = {'V1' 'V2' 'V3' 'hV4' 'VO1' 'VO2','PHC1','PHC2',...
+            'TO1','LO1','LO2','V3A','V3B','IPS0','IPS1','IPS2','IPS3','SPL1'}; % exclude: 'IPS4','IPS5'
 
-    roiSelection = {'V1' 'V2' 'V3' 'hV4' 'VO1' 'VO2','PHC1','PHC2',...
-        'TO1','LO1','LO2','V3A','V3B','IPS0','IPS1','IPS2','IPS3','SPL1'}; % exclude: 'IPS4','IPS5'
+        wangROIs = {'V1v' 'V1d' 'V2v' 'V2d' 'V3v' 'V3d' 'hV4' 'VO1' 'VO2' 'PHC1' 'PHC2' ...
+            'TO2' 'TO1' 'LO2' 'LO1' 'V3B' 'V3A' 'IPS0' 'IPS1' 'IPS2' 'IPS3' 'IPS4' ...
+            'IPS5' 'SPL1' 'FEF'}; % Wang ROIs, in order
 
-    wangROIs = {'V1v' 'V1d' 'V2v' 'V2d' 'V3v' 'V3d' 'hV4' 'VO1' 'VO2' 'PHC1' 'PHC2' ...
-        'TO2' 'TO1' 'LO2' 'LO1' 'V3B' 'V3A' 'IPS0' 'IPS1' 'IPS2' 'IPS3' 'IPS4' ...
-        'IPS5' 'SPL1' 'FEF'}; % Wang ROIs, in order
+        myConds = {'cont','mofo','disp'};
+        benoitConds = {'C1vsC2','C2vsC3','C1vsC3'};
 
-    myConds = {'cont','mofo','disp'};
-    benoitConds = {'C1vsC2','C2vsC3','C1vsC3'};
+        if opt.runFull
+            roiFiles = '*wangatlas_al_mask.nii.gz';
+            roiLabel = [cellfun(@(x) [x,'-L'],wangROIs,'uni',false),cellfun(@(x) [x,'-R'],wangROIs,'uni',false)];
+            for s=1:subCount(1)
+                curROI = subfiles([subjFolders{s},'/ROIs/',roiFiles],1);
+                disp(['Reading ',subjFolders{s},' ...']);
+                if ~benoitSubj(s)
+                    curConds = myConds;
+                else
+                    curConds = benoitConds;
+                end
+                curROI = subfiles([subjFolders{s},'/ROIs/',roiFiles],1);
+                for c = 1:length(curConds)
+                    curFiles = subfiles([subjFolders{s},'/run*',curConds{c},'*',suffix,'.nii.gz'],1);
+                    if curFiles{1}
+                        [roiData.(curConds{c})(s,:)] = mriRoiFFT(curFiles,curROI,roiLabel,nCycles,roiSelection);
+                    else
+                    end
+                end
+            end
+            save(savePath{1},'roiData','-v7.3');
+        else
+            load(savePath{1},'roiData')
+        end
 
-    if opt.runFull
-        roiFiles = '*wangatlas_al_mask.nii.gz';
-        roiLabel = [cellfun(@(x) [x,'-L'],wangROIs,'uni',false),cellfun(@(x) [x,'-R'],wangROIs,'uni',false)];
+        %% RING ROIS
+        if opt.runRing
+            ringIncr = 0.25;
+            ringSize = .5;
+            ringMax = 6;
+            ringList = (ringSize/2):ringIncr:ringMax; % list of centers
+            wangFiles = '*wangatlas_al_mask.nii.gz';
+            ringFiles = '*eccen.V1-V3model_al_mask.nii.gz';
+            roiLabel = [cellfun(@(x) [x,'-L'],wangROIs,'uni',false),cellfun(@(x) [x,'-R'],wangROIs,'uni',false)];
+            evcIdx{1} = find(cell2mat(cellfun(@(x) ~isempty(strfind(x,'V1')),roiLabel,'uni',false)));
+            evcIdx{2} = find(cell2mat(cellfun(@(x) ~isempty(strfind(x,'V2')),roiLabel,'uni',false)));
+            evcIdx{3} = find(cell2mat(cellfun(@(x) ~isempty(strfind(x,'V3')),roiLabel,'uni',false)));
+            abIdx = find(cell2mat(cellfun(@(x) sum([isempty(strfind(x,'V3A')),isempty(strfind(x,'V3B'))],2)==2,roiLabel,'uni',false)));
+            evcIdx{3} = evcIdx{3}(ismember(evcIdx{3},abIdx));
+            evcNames = {'V1','V2','V3'};
+
+            for s = 1:subCount(1);
+                if ~benoitSubj(s)
+                    curConds = myConds;
+                else
+                    curConds = benoitConds;
+                end
+                disp(['Reading ring: ',subjFolders{s},' ...']);
+                wangROI = subfiles([subjFolders{s},'/ROIs/',wangFiles],1);
+                ringROI = subfiles([subjFolders{s},'/ROIs/',ringFiles],1);
+                dataFiles = cellfun(@(x) subfiles([subjFolders{s},'/run*',x,'*',suffix,'.nii.gz'],1),curConds,'uni',false);
+                wangData = mriReadBrainData(wangROI);
+                ringData = mriReadBrainData(ringROI);
+                for c=1:length(dataFiles)
+                    if dataFiles{c}{1}
+                        funcData = mean(mriReadBrainData(dataFiles{c}),5);
+                        for r = 1:length(ringList)
+                            curMin = ringList(r)-(ringSize/2);
+                            curMax = ringList(r)+(ringSize/2);
+                            curNames = cellfun(@(x) [x,'ring',num2str(curMin),'-',num2str(curMax)],evcNames,'uni',false);
+                            curRing = (ringData>curMin).*(ringData<=curMax);
+                            curMask = cellfun(@(x) repmat(curRing.*ismember(wangData,x),1,1,1,nTR),evcIdx,'uni',false);
+                            [tmpResults(:,r)] = cell2mat(arrayfun(@(x) ...
+                                mriFFT(reshape(funcData(curMask{x}==1),length(find(curMask{x}==1))/nTR,nTR)',nCycles,nHarm,curNames{x}),...
+                                1:3,'uni',false));
+                        end
+                        ringRoiData.(curConds{c})(s,:) = reshape(tmpResults,1,[]);
+                        clear tmpResults;
+                    else
+                    end 
+                end
+            end
+            save(savePath{2},'ringRoiData','-v7.3');
+        else
+            load(savePath{2},'ringRoiData')
+        end
+
+        %% FOVEA ROIS
+
+        foveaTypes = {'inner','border','outer'};
+
+        if opt.runFovea
+            wangFiles = '*wangatlas_al_mask.nii.gz';
+            foveaFiles = '*fovea_3mm_al_mask.nii.gz';
+            roiLabel = [cellfun(@(x) [x,'-L'],wangROIs,'uni',false),cellfun(@(x) [x,'-R'],wangROIs,'uni',false)];
+
+            evcNames = {'V1','V2','V3','V3A','V3B','hV4','VO1','LO1','LO2','TO1'};
+            for z=1:length(evcNames)
+                evcIdx{z} = find(cell2mat(cellfun(@(x) ~isempty(strfind(x,evcNames{z})),roiLabel,'uni',false)));
+            end
+            abIdx = find(cell2mat(cellfun(@(x) sum([isempty(strfind(x,'V3A')),isempty(strfind(x,'V3B'))],2)==2,roiLabel,'uni',false)));
+            evcIdx{3} = evcIdx{3}(ismember(evcIdx{3},abIdx));
+
+            for s = 1:subCount(1);
+                if ~benoitSubj(s)
+                    curConds = myConds;
+                else
+                    curConds = benoitConds;
+                end
+                disp(['Reading fovea: ',subjFolders{s},' ...']);
+                wangROI = subfiles([subjFolders{s},'/ROIs/',wangFiles],1);
+                foveaROI = subfiles([subjFolders{s},'/ROIs/',foveaFiles],1);
+                dataFiles = cellfun(@(x) subfiles([subjFolders{s},'/run*',x,'*',suffix,'.nii.gz'],1),curConds,'uni',false);
+                wangData = mriReadBrainData(wangROI);
+                foveaData = double(mriReadBrainData(foveaROI));
+                for c=1:length(dataFiles)
+                    if dataFiles{c}{1}
+                        funcData = mean(mriReadBrainData(dataFiles{c}),5); % average over runs
+                        fovMask{1} = foveaData(:,:,:,2); % inner
+                        fovMask{2} = foveaData(:,:,:,4); % border
+                        fovMask{3} = sum(foveaData(:,:,:,[1,2]),4)==0; % everything else
+                        for f=1:length(foveaTypes)
+                            curNames = cellfun(@(x) [x,'_',foveaTypes{f}],evcNames,'uni',false);
+                            curFovea = fovMask{f};
+                            curMask = cellfun(@(x) repmat(curFovea.*ismember(wangData,x),1,1,1,nTR),evcIdx,'uni',false);  
+                            tmpResults(:,f) = cell2mat(arrayfun(@(x) ...
+                                mriFFT(reshape(funcData(curMask{x}==1),length(find(curMask{x}==1))/nTR,nTR)',nCycles,nHarm,curNames{x}),...
+                                1:length(evcNames),'uni',false));
+                        end
+                        foveaRoiData.(curConds{c})(s,:) = reshape(tmpResults,[],1);
+                        clear tmpResults;
+                    else
+                    end 
+                end
+            end
+            save(savePath{3},'foveaRoiData','-v7.3');
+        else
+            load(savePath{3},'foveaRoiData')
+        end
+
+
+        %% RING TEST ANALYSIS
+        % testSubj = 1;
+        % ringFiles = '*_ringAll_al_mask.nii.gz';
+        % ringROI = subfiles([subjFolders{testSubj},'/ROIs/',ringFiles],1);
+        % roiFiles = '*wangatlas_al_mask.nii.gz';
+        % allROI = subfiles([subjFolders{testSubj},'/ROIs/',roiFiles],1);
+        % 
+        % tmp = niftiRead(allROI{:});
+        % roiData = tmp.data;
+        % roiDims = size(roiData);
+        % tmp = niftiRead(ringROI{:});
+        % ringData = tmp.data;
+        % ringDims = size(ringData);
+        % 
+        % roiLabel = [cellfun(@(x) [x,'-L'],wangROIs,'uni',false),cellfun(@(x) [x,'-R'],wangROIs,'uni',false)];
+        % ringList = {'0-1.5','1.5-2.5','2.5-3.5','3.5-4.5','4.5-5.5','5.5-6.5','6.5-7.5','7.5-8.5','8.5-9.5'};
+        % evcIdx = cell2mat(cellfun(@(x) sum([~isempty(strfind(x,'V1')),~isempty(strfind(x,'V2')),~isempty(strfind(x,'V3'))],2),roiLabel,'uni',false));
+        % abIdx = cell2mat(cellfun(@(x) sum([isempty(strfind(x,'V3A')),isempty(strfind(x,'V3B'))],2)==2,roiLabel,'uni',false));
+        % evcIdx = logical(abIdx.*evcIdx);
+        % tempLabels = roiLabel(evcIdx);
+        % ringNames=arrayfun(@(x) sprintf('ring%d',x),1:length(ringList),'uni',false); % ring ROIs
+        % [ii,jj]=ndgrid(1:numel(tempLabels),1:numel(ringNames));
+        % ringLabel=arrayfun(@(x,y) [ringNames{x},'_',tempLabels{y}],jj(:),ii(:),'uni',false)';
+        % 
+        % for t = 1:50
+        %     cmpIdx = cell2mat(cellfun(@(x) ~isempty(strfind(x,roiLabel{t})),ringLabel,'uni',false));
+        % 
+        %     ringMask = ismember(ringData,find(cmpIdx));
+        %     roiMask = ismember(roiData,t);
+        % 
+        %     ringSize(t) = numel(find(ringMask==1));
+        %     roiSize(t) = numel(find(roiMask==1));
+        %     ringOverlap(t) = numel(find(ismember(find(roiMask==1),find(ringMask==1))))./numel(find(roiMask==1));
+        % end
+        % figure;
+        % subplot(1,2,1);imshow(roiData(:,:,30)>0)
+        % subplot(1,2,2);imshow(ringData(:,:,30)>0);
+
+
+
+        % ringList = cat(1,{CONTring(1,:).name});
+        % roiList = cat(1,{CONTdata(1,:).name});
+        % testROI = 4;
+        % testSubj = 1;
+        % cmpIdx = cell2mat(cellfun(@(x) ~isempty(strfind(x,roiList{testROI})),ringList,'uni',false));
+        % cmpData = cat(1,CONTring(testSubj,cmpIdx).rawData);
+        % cmpROI = mean(mean(cmpData,3));
+        % wholeROI = mean(mean(CONTdata(testSubj,testROI).rawData,3));
+
+        %% COMBINE ROIs and COUNT VOXELS
+        allConds = [myConds,benoitConds];
+        for c=1:length(allConds)
+             roiData.(allConds{c}) = cat(2,roiData.(allConds{c}),ringRoiData.(allConds{c}),foveaRoiData.(allConds{c}));
+        end
+        %get fovea indices
+        roiList = cat(1,{roiData.cont(1,:).name}); % all ROIs, including fovea
+        innerIdx = find(cell2mat(arrayfun(@(x) ~isempty(strfind(roiData.cont(1,x).name,'inner')),1:length(roiList),'uni',false)));
+        outerIdx = find(cell2mat(arrayfun(@(x) ~isempty(strfind(roiData.cont(1,x).name,'outer')),1:length(roiList),'uni',false)));
+        borderIdx = find(cell2mat(arrayfun(@(x) ~isempty(strfind(roiData.cont(1,x).name,'border')),1:length(roiList),'uni',false)));
+
         for s=1:subCount(1)
-            curROI = subfiles([subjFolders{s},'/ROIs/',roiFiles],1);
-            disp(['Reading ',subjFolders{s},' ...']);
             if ~benoitSubj(s)
                 curConds = myConds;
             else
                 curConds = benoitConds;
             end
-            curROI = subfiles([subjFolders{s},'/ROIs/',roiFiles],1);
-            for c = 1:length(curConds)
-                curFiles = subfiles([subjFolders{s},'/run*',curConds{c},'*',suffix,'.nii.gz'],1);
-                if curFiles{1}
-                    [roiData.(curConds{c})(s,:)] = mriRoiFFT(curFiles,curROI,roiLabel,nCycles,roiSelection);
+            voxCount(s,1:length(roiList)) = NaN;
+            for c=1:length(curConds)
+                subjROIs = cat(1,{roiData.(curConds{c})(s,:).name});
+                runCount(c,s) = size(roiData.(curConds{c})(s,1).rawData,3); % ROI does not matter, just grab first
+                runCount(c,s) = runCount(c,s).*~isempty(roiData.(curConds{c})(s,1).rawData);
+                if c==1
+                    voxCount(s,1:length(subjROIs)) = cell2mat(arrayfun(@(x) size(roiData.(curConds{c})(s,x).rawData,2), 1:length(subjROIs),'uni',false));
                 else
                 end
             end
-        end
-        save(savePath{1},'roiData','-v7.3');
-    else
-        load(savePath{1},'roiData')
-    end
-
-    %% RING ROIS
-    if opt.runRing
-        ringIncr = 0.25;
-        ringSize = .5;
-        ringMax = 6;
-        ringList = (ringSize/2):ringIncr:ringMax; % list of centers
-        wangFiles = '*wangatlas_al_mask.nii.gz';
-        ringFiles = '*eccen.V1-V3model_al_mask.nii.gz';
-        roiLabel = [cellfun(@(x) [x,'-L'],wangROIs,'uni',false),cellfun(@(x) [x,'-R'],wangROIs,'uni',false)];
-        evcIdx{1} = find(cell2mat(cellfun(@(x) ~isempty(strfind(x,'V1')),roiLabel,'uni',false)));
-        evcIdx{2} = find(cell2mat(cellfun(@(x) ~isempty(strfind(x,'V2')),roiLabel,'uni',false)));
-        evcIdx{3} = find(cell2mat(cellfun(@(x) ~isempty(strfind(x,'V3')),roiLabel,'uni',false)));
-        abIdx = find(cell2mat(cellfun(@(x) sum([isempty(strfind(x,'V3A')),isempty(strfind(x,'V3B'))],2)==2,roiLabel,'uni',false)));
-        evcIdx{3} = evcIdx{3}(ismember(evcIdx{3},abIdx));
-        evcNames = {'V1','V2','V3'};
-
-        for s = 1:subCount(1);
-            if ~benoitSubj(s)
-                curConds = myConds;
-            else
-                curConds = benoitConds;
-            end
-            disp(['Reading ring: ',subjFolders{s},' ...']);
-            wangROI = subfiles([subjFolders{s},'/ROIs/',wangFiles],1);
-            ringROI = subfiles([subjFolders{s},'/ROIs/',ringFiles],1);
-            dataFiles = cellfun(@(x) subfiles([subjFolders{s},'/run*',x,'*',suffix,'.nii.gz'],1),curConds,'uni',false);
-            wangData = mriReadBrainData(wangROI);
-            ringData = mriReadBrainData(ringROI);
-            for c=1:length(dataFiles)
-                if dataFiles{c}{1}
-                    funcData = mean(mriReadBrainData(dataFiles{c}),5);
-                    for r = 1:length(ringList)
-                        curMin = ringList(r)-(ringSize/2);
-                        curMax = ringList(r)+(ringSize/2);
-                        curNames = cellfun(@(x) [x,'ring',num2str(curMin),'-',num2str(curMax)],evcNames,'uni',false);
-                        curRing = (ringData>curMin).*(ringData<=curMax);
-                        curMask = cellfun(@(x) repmat(curRing.*ismember(wangData,x),1,1,1,nTR),evcIdx,'uni',false);
-                        [tmpResults(:,r)] = cell2mat(arrayfun(@(x) ...
-                            mriFFT(reshape(funcData(curMask{x}==1),length(find(curMask{x}==1))/nTR,nTR)',nCycles,nHarm,curNames{x}),...
-                            1:3,'uni',false));
-                    end
-                    ringRoiData.(curConds{c})(s,:) = reshape(tmpResults,1,[]);
-                    clear tmpResults;
-                else
-                end 
+            for r=1:length(innerIdx)
+                foveaCount(s,r,:) = [voxCount(s,innerIdx(r)),voxCount(s,borderIdx(r)),voxCount(s,outerIdx(r))];
             end
         end
-        save(savePath{2},'ringRoiData','-v7.3');
-    else
-        load(savePath{2},'ringRoiData')
-    end
+        missingROIs = roiList(nansum(voxCount<5,1)>2); % names of ROIs where more than 2 subjects have fewer than 5 voxels
 
-    %% FOVEA ROIS
-
-    foveaTypes = {'inner','border','outer'};
-
-    if opt.runFovea
-        wangFiles = '*wangatlas_al_mask.nii.gz';
-        foveaFiles = '*fovea_3mm_al_mask.nii.gz';
-        roiLabel = [cellfun(@(x) [x,'-L'],wangROIs,'uni',false),cellfun(@(x) [x,'-R'],wangROIs,'uni',false)];
-
-        evcNames = {'V1','V2','V3','V3A','V3B','hV4','VO1','LO1','LO2','TO1'};
-        for z=1:length(evcNames)
-            evcIdx{z} = find(cell2mat(cellfun(@(x) ~isempty(strfind(x,evcNames{z})),roiLabel,'uni',false)));
-        end
-        abIdx = find(cell2mat(cellfun(@(x) sum([isempty(strfind(x,'V3A')),isempty(strfind(x,'V3B'))],2)==2,roiLabel,'uni',false)));
-        evcIdx{3} = evcIdx{3}(ismember(evcIdx{3},abIdx));
-
-        for s = 1:subCount(1);
-            if ~benoitSubj(s)
-                curConds = myConds;
-            else
-                curConds = benoitConds;
-            end
-            disp(['Reading fovea: ',subjFolders{s},' ...']);
-            wangROI = subfiles([subjFolders{s},'/ROIs/',wangFiles],1);
-            foveaROI = subfiles([subjFolders{s},'/ROIs/',foveaFiles],1);
-            dataFiles = cellfun(@(x) subfiles([subjFolders{s},'/run*',x,'*',suffix,'.nii.gz'],1),curConds,'uni',false);
-            wangData = mriReadBrainData(wangROI);
-            foveaData = double(mriReadBrainData(foveaROI));
-            for c=1:length(dataFiles)
-                if dataFiles{c}{1}
-                    funcData = mean(mriReadBrainData(dataFiles{c}),5); % average over runs
-                    fovMask{1} = foveaData(:,:,:,2); % inner
-                    fovMask{2} = foveaData(:,:,:,4); % border
-                    fovMask{3} = sum(foveaData(:,:,:,[1,2]),4)==0; % everything else
-                    for f=1:length(foveaTypes)
-                        curNames = cellfun(@(x) [x,'_',foveaTypes{f}],evcNames,'uni',false);
-                        curFovea = fovMask{f};
-                        curMask = cellfun(@(x) repmat(curFovea.*ismember(wangData,x),1,1,1,nTR),evcIdx,'uni',false);  
-                        tmpResults(:,f) = cell2mat(arrayfun(@(x) ...
-                            mriFFT(reshape(funcData(curMask{x}==1),length(find(curMask{x}==1))/nTR,nTR)',nCycles,nHarm,curNames{x}),...
-                            1:length(evcNames),'uni',false));
-                    end
-                    foveaRoiData.(curConds{c})(s,:) = reshape(tmpResults,[],1);
-                    clear tmpResults;
-                else
-                end 
-            end
-        end
-        save(savePath{3},'foveaRoiData','-v7.3');
-    else
-        load(savePath{3},'foveaRoiData')
-    end
+        % combine DIPS and Benoit DISP (C2vsC3):
+        roiData.alldisp = cat(1,roiData.disp(:,1:size(roiData.C2vsC3,2)),roiData.C2vsC3(benoitSubj,:));
+        allConds{end+1} = 'alldisp';
 
 
-    %% RING TEST ANALYSIS
-    % testSubj = 1;
-    % ringFiles = '*_ringAll_al_mask.nii.gz';
-    % ringROI = subfiles([subjFolders{testSubj},'/ROIs/',ringFiles],1);
-    % roiFiles = '*wangatlas_al_mask.nii.gz';
-    % allROI = subfiles([subjFolders{testSubj},'/ROIs/',roiFiles],1);
-    % 
-    % tmp = niftiRead(allROI{:});
-    % roiData = tmp.data;
-    % roiDims = size(roiData);
-    % tmp = niftiRead(ringROI{:});
-    % ringData = tmp.data;
-    % ringDims = size(ringData);
-    % 
-    % roiLabel = [cellfun(@(x) [x,'-L'],wangROIs,'uni',false),cellfun(@(x) [x,'-R'],wangROIs,'uni',false)];
-    % ringList = {'0-1.5','1.5-2.5','2.5-3.5','3.5-4.5','4.5-5.5','5.5-6.5','6.5-7.5','7.5-8.5','8.5-9.5'};
-    % evcIdx = cell2mat(cellfun(@(x) sum([~isempty(strfind(x,'V1')),~isempty(strfind(x,'V2')),~isempty(strfind(x,'V3'))],2),roiLabel,'uni',false));
-    % abIdx = cell2mat(cellfun(@(x) sum([isempty(strfind(x,'V3A')),isempty(strfind(x,'V3B'))],2)==2,roiLabel,'uni',false));
-    % evcIdx = logical(abIdx.*evcIdx);
-    % tempLabels = roiLabel(evcIdx);
-    % ringNames=arrayfun(@(x) sprintf('ring%d',x),1:length(ringList),'uni',false); % ring ROIs
-    % [ii,jj]=ndgrid(1:numel(tempLabels),1:numel(ringNames));
-    % ringLabel=arrayfun(@(x,y) [ringNames{x},'_',tempLabels{y}],jj(:),ii(:),'uni',false)';
-    % 
-    % for t = 1:50
-    %     cmpIdx = cell2mat(cellfun(@(x) ~isempty(strfind(x,roiLabel{t})),ringLabel,'uni',false));
-    % 
-    %     ringMask = ismember(ringData,find(cmpIdx));
-    %     roiMask = ismember(roiData,t);
-    % 
-    %     ringSize(t) = numel(find(ringMask==1));
-    %     roiSize(t) = numel(find(roiMask==1));
-    %     ringOverlap(t) = numel(find(ismember(find(roiMask==1),find(ringMask==1))))./numel(find(roiMask==1));
-    % end
-    % figure;
-    % subplot(1,2,1);imshow(roiData(:,:,30)>0)
-    % subplot(1,2,2);imshow(ringData(:,:,30)>0);
-
-
-
-    % ringList = cat(1,{CONTring(1,:).name});
-    % roiList = cat(1,{CONTdata(1,:).name});
-    % testROI = 4;
-    % testSubj = 1;
-    % cmpIdx = cell2mat(cellfun(@(x) ~isempty(strfind(x,roiList{testROI})),ringList,'uni',false));
-    % cmpData = cat(1,CONTring(testSubj,cmpIdx).rawData);
-    % cmpROI = mean(mean(cmpData,3));
-    % wholeROI = mean(mean(CONTdata(testSubj,testROI).rawData,3));
-
-    %% COMBINE ROIs and COUNT VOXELS
-    allConds = [myConds,benoitConds];
-    for c=1:length(allConds)
-         roiData.(allConds{c}) = cat(2,roiData.(allConds{c}),ringRoiData.(allConds{c}),foveaRoiData.(allConds{c}));
-    end
-    %get fovea indices
-    roiList = cat(1,{roiData.cont(1,:).name}); % all ROIs, including fovea
-    innerIdx = find(cell2mat(arrayfun(@(x) ~isempty(strfind(roiData.cont(1,x).name,'inner')),1:length(roiList),'uni',false)));
-    outerIdx = find(cell2mat(arrayfun(@(x) ~isempty(strfind(roiData.cont(1,x).name,'outer')),1:length(roiList),'uni',false)));
-    borderIdx = find(cell2mat(arrayfun(@(x) ~isempty(strfind(roiData.cont(1,x).name,'border')),1:length(roiList),'uni',false)));
-
-    for s=1:subCount(1)
-        if ~benoitSubj(s)
-            curConds = myConds;
-        else
-            curConds = benoitConds;
-        end
-        voxCount(s,1:length(roiList)) = NaN;
-        for c=1:length(curConds)
-            subjROIs = cat(1,{roiData.(curConds{c})(s,:).name});
-            runCount(c,s) = size(roiData.(curConds{c})(s,1).rawData,3); % ROI does not matter, just grab first
-            runCount(c,s) = runCount(c,s).*~isempty(roiData.(curConds{c})(s,1).rawData);
-            if c==1
-                voxCount(s,1:length(subjROIs)) = cell2mat(arrayfun(@(x) size(roiData.(curConds{c})(s,x).rawData,2), 1:length(subjROIs),'uni',false));
-            else
-            end
-        end
-        for r=1:length(innerIdx)
-            foveaCount(s,r,:) = [voxCount(s,innerIdx(r)),voxCount(s,borderIdx(r)),voxCount(s,outerIdx(r))];
-        end
-    end
-    missingROIs = roiList(nansum(voxCount<5,1)>2); % names of ROIs where more than 2 subjects have fewer than 5 voxels
-
-    % combine DIPS and Benoit DISP (C2vsC3):
-    roiData.alldisp = cat(1,roiData.disp(:,1:size(roiData.C2vsC3,2)),roiData.C2vsC3(benoitSubj,:));
-    allConds{end+1} = 'alldisp';
-
-
-    %% COMPUTE INCOHERENT SNR
-    % fitComplex = [];
-    % for r=1:length(roiSelection)
-    %     incohIdx = ismember(roiList,roiSelection{r});
-    %     for s=1:subCount(2)
-    %         clear runMean;
-    %         runMean(:,:,1) = mean(roiData.cont(s,incohIdx).rawData,3);
-    %         runMean(:,:,2) = mean(roiData.mofo(s,incohIdx).rawData,3);
-    %         if ~isnan(roiData.disp(s,r).harmonics)
-    %             runMean(:,:,3) = mean(roiData.disp(s,incohIdx).rawData,3);
-    %         else
-    %             runMean(:,:,3) = nan(size(runMean(:,:,2)));
-    %         end
-    %         nTR = size(runMean,1);
-    %         maxCycles = round(nTR/2);
-    %         fftComplex = 2.*fft(runMean,[],1) ./ nTR;
-    %         harmComplex = fftComplex(2:maxCycles+1,:,:); % don't include DC
-    %         lst2 = false(size(1:maxCycles));
-    %         lst2([nCycles-1,nCycles-2,nCycles+1,nCycles+2])=true;
-    %         voxAmp = squeeze(abs(harmComplex(nCycles,:,:)));
-    %         voxSNR = squeeze(abs(harmComplex(nCycles,:,:))./nanmean(abs(harmComplex(lst2,:,:)),1));
-    %         ampIncoh(s,:,r) = nanmean(voxAmp,1);
-    %         snrIncoh(s,:,r) = nanmean(voxSNR,1);
-    %         % grab contrast values for fitting
-    %         if r == 1
-    %             fitComplex = [fitComplex;squeeze(harmComplex(nCycles,:,1))'];
-    %         else
-    %         end
-    %     end
-    % end
-    % % 
-    % snrIncohMean = squeeze(nanmean(snrIncoh,1));
-    % snrIncohStderr = squeeze(nanstd(snrIncoh,0,1))./sqrt(subCount(2)');
-    % ampIncohMean = squeeze(nanmean(ampIncoh,1));
-    % ampIncohStderr = squeeze(nanstd(ampIncoh,0,1))./sqrt(subCount(2)');
-    % % figure;
-    % errorbar(1:length(roiSelection),snrIncohMean(1,:),snrIncohStderr(1,:),'r');
-    % hold on;
-    % errorbar(1:length(roiSelection),snrIncohMean(2,:),snrIncohStderr(2,:),'b');
-    % errorbar(1:length(roiSelection),snrIncohMean(3,:),snrIncohStderr(3,:),'g');
-    % hold off
+        %% COMPUTE INCOHERENT SNR
+        % fitComplex = [];
+        % for r=1:length(roiSelection)
+        %     incohIdx = ismember(roiList,roiSelection{r});
+        %     for s=1:subCount(2)
+        %         clear runMean;
+        %         runMean(:,:,1) = mean(roiData.cont(s,incohIdx).rawData,3);
+        %         runMean(:,:,2) = mean(roiData.mofo(s,incohIdx).rawData,3);
+        %         if ~isnan(roiData.disp(s,r).harmonics)
+        %             runMean(:,:,3) = mean(roiData.disp(s,incohIdx).rawData,3);
+        %         else
+        %             runMean(:,:,3) = nan(size(runMean(:,:,2)));
+        %         end
+        %         nTR = size(runMean,1);
+        %         maxCycles = round(nTR/2);
+        %         fftComplex = 2.*fft(runMean,[],1) ./ nTR;
+        %         harmComplex = fftComplex(2:maxCycles+1,:,:); % don't include DC
+        %         lst2 = false(size(1:maxCycles));
+        %         lst2([nCycles-1,nCycles-2,nCycles+1,nCycles+2])=true;
+        %         voxAmp = squeeze(abs(harmComplex(nCycles,:,:)));
+        %         voxSNR = squeeze(abs(harmComplex(nCycles,:,:))./nanmean(abs(harmComplex(lst2,:,:)),1));
+        %         ampIncoh(s,:,r) = nanmean(voxAmp,1);
+        %         snrIncoh(s,:,r) = nanmean(voxSNR,1);
+        %         % grab contrast values for fitting
+        %         if r == 1
+        %             fitComplex = [fitComplex;squeeze(harmComplex(nCycles,:,1))'];
+        %         else
+        %         end
+        %     end
+        % end
+        % % 
+        % snrIncohMean = squeeze(nanmean(snrIncoh,1));
+        % snrIncohStderr = squeeze(nanstd(snrIncoh,0,1))./sqrt(subCount(2)');
+        % ampIncohMean = squeeze(nanmean(ampIncoh,1));
+        % ampIncohStderr = squeeze(nanstd(ampIncoh,0,1))./sqrt(subCount(2)');
+        % % figure;
+        % errorbar(1:length(roiSelection),snrIncohMean(1,:),snrIncohStderr(1,:),'r');
+        % hold on;
+        % errorbar(1:length(roiSelection),snrIncohMean(2,:),snrIncohStderr(2,:),'b');
+        % errorbar(1:length(roiSelection),snrIncohMean(3,:),snrIncohStderr(3,:),'g');
+        % hold off
 
     %% PROCESS DATA
-    close all;
-    for r=1:length(roiList)
-        fprintf('processing %s\n',roiList{r});
-        for c=1:length(allConds)
-            for s=1:subCount(1);
-                if (c<4 && benoitSubj(s)) || (r>size(roiData.(allConds{c})(s,:),2))
-                    % if my conditions and Benoit subject, or if data is empty, simply replace with NaNs 
-                    addNans = true;
-                else
-                    if isempty(roiData.(allConds{c})(s,r).harmonics) || any(isnan(roiData.(allConds{c})(s,r).harmonics))
+        for r=1:length(roiList)
+            fprintf('processing %s\n',roiList{r});
+            for c=1:length(allConds)
+                for s=1:subCount(1);
+                    if (c<4 && benoitSubj(s)) || (r>size(roiData.(allConds{c})(s,:),2))
+                        % if my conditions and Benoit subject, or if data is empty, simply replace with NaNs 
                         addNans = true;
                     else
-                        addNans = false;
+                        if isempty(roiData.(allConds{c})(s,r).harmonics) || any(isnan(roiData.(allConds{c})(s,r).harmonics))
+                            addNans = true;
+                        else
+                            addNans = false;
+                        end
                     end
-                end
-                if benoitSubj(s) 
-                    repData = roiData.C1vsC2(s,1); % replacement data, used for size
-                else
-                    repData = roiData.cont(s,1);
-                end
-                if addNans
-
-                    roiData.(allConds{c})(s,r).name = NaN;
-                    roiData.(allConds{c})(s,r).harmonics = NaN(size(repData.harmonics));
-                    roiData.(allConds{c})(s,r).meanCycle = NaN(size(repData.meanCycle));
-                    roiData.(allConds{c})(s,r).zScore = NaN(size(repData.zScore));
-                    roiData.(allConds{c})(s,r).SNR = NaN(size(repData.SNR));
-                    roiData.(allConds{c})(s,r).phase = NaN(size(repData.phase));
-                    roiData.(allConds{c})(s,r).rawData = NaN(size(repData.rawData,1),1,size(repData.rawData,3)); % since this is fake data, make number of voxels 1.
-                    roiData.(allConds{c})(s,r).realSignal = NaN(size(repData.realSignal));
-                    roiData.(allConds{c})(s,r).imagSignal = NaN(size(repData.imagSignal));
-                    roiData.(allConds{c})(s,r).realNoise = NaN(size(repData.realNoise));
-                    roiData.(allConds{c})(s,r).imagNoise = NaN(size(repData.imagNoise));
-                else
-                end
-                % incoherent SNR field does not exist, so always add NaNs
-                roiData.(allConds{c})(s,r).incohSNR = NaN(size(repData.SNR));
-                clear repData;
-            end
-
-            % find those subjects whose sum(meanCycle) is not NAN
-            nanIdx{r,c} = cell2mat(arrayfun(@(x)~isnan(sum(x.meanCycle)),roiData.(allConds{c})(:,r),'uni',false )); 
-            numSubs(r,c) = length(find(nanIdx{r,c} == 1));
-            % concatenate each zScore by row, create a subjectXzScore matrix. (zScore is a 1x5 vector)
-            allZ{r}(:,:,c) = cat(2,roiData.(allConds{c})(:,r).zScore); 
-            % calculate the column mean of zScore matrix
-            allMeanZ(c,r,:)=nanmean(cat(2,roiData.(allConds{c})(:,r).zScore));
-            % and standard deviation
-            allStdevZ(c,r,:)=nanstd(cat(2,roiData.(allConds{c})(:,r).zScore))/sqrt(numSubs(r,c));
-
-            % COMPLEX
-            allRealSignal(:,:,c,r) = cat(2,roiData.(allConds{c})(:,r).realSignal)';
-            allImagSignal(:,:,c,r) = cat(2,roiData.(allConds{c})(:,r).imagSignal)';  
-            allRealNoise(:,:,c,r) = cat(2,roiData.(allConds{c})(:,r).realNoise)';
-            allImagNoise(:,:,c,r) = cat(2,roiData.(allConds{c})(:,r).imagNoise)';
-
-            % ADJUST PHASE phaseS
-            for n=1:2
-                if n==1
-                    tempComplex = complex(allRealSignal(:,:,c,r),allImagSignal(:,:,c,r));
-                else
-                    tempComplex = complex(allRealNoise(:,:,c,r),allImagNoise(:,:,c,r));
-                end
-                tempMag = abs(tempComplex);
-                tempAngle = angle(tempComplex);
-                if c>2 % if disp or Benoit data, rotate by pi (180 deg.)
-                    tempAngle = tempAngle+pi;     % condition 3 is 180 degrees out of phase
-                else
-                end
-                if c<4 % phase angle adjusment due to mux, only on my data
-                    tempAngle = tempAngle-pi/3;                 % pi/3 radians = 60 degrees = 4 seconds (pre-TR 16, rather than 12, seconds)
-                else
-                end
-                if c>6 % if combined disp data
-                    tempAngle(~benoitSubj,:) = tempAngle(~benoitSubj,:)-pi/3;
-                else
-                end
-                tempAngle = phaseMod(tempAngle); % adjust to sine base
-                tempComplex = tempMag.*exp(1i*tempAngle); % convert back to complex numbers
-                if n==1
-                    allRealSignal(:,:,c,r) = real(tempComplex);
-                    allImagSignal(:,:,c,r) = imag(tempComplex);
-                else
-                    allRealNoise(:,:,c,r) = real(tempComplex);
-                    allImagNoise(:,:,c,r) = imag(tempComplex);
-                end
-                clear temp*
-            end
-
-            % COMPUTE VECTOR MEAN AND ERRORS
-            if numSubs(r,c) > 1 % if at least two subjects have data
-                tempVecErr = fitErrorEllipse([allRealSignal(nanIdx{r,c},whichHarm,c,r),allImagSignal(nanIdx{r,c},whichHarm,c,r)],'SEM',false);
-                vecErrLow(c,r) = tempVecErr(1);
-                vecErrHigh(c,r) = tempVecErr(2);
-                meanComplex(c,r) = complex(mean(allRealSignal(nanIdx{r,c},whichHarm,c,r),1),mean(allImagSignal(nanIdx{r,c},whichHarm,c,r),1));
-                vecMeanAmp(c,r) = abs(meanComplex(c,r));
-                vecMeanPhase(c,r) = phase(meanComplex(c,r));
-                if strcmp(roiList{r},'LO1') && c==7
-                    disp('LO1');
-                else
-                end
-                tempResults = tSquaredFourierCoefs([allRealSignal(nanIdx{r,c},whichHarm,c,r),allImagSignal(nanIdx{r,c},whichHarm,c,r)],'testMu',[0,0],'alphaVal',0.05);
-                vecMeanP(c,r) = tempResults.pVal;
-                if vecMeanPhase(c,r)< 0 
-                    vecMeanPhase(c,r) = 2*pi+vecMeanPhase(c,r);
-                else
-                end
-            else
-                vecErrLow(c,r) = NaN;
-                vecErrHigh(c,r) = NaN;
-                meanComplex(c,r) = NaN;
-                vecMeanAmp(c,r) = NaN;
-                vecMeanPhase(c,r) = NaN;
-                vecMeanP(c,r) = NaN;
-            end
-
-            % COMPUTE MEAN CYCLE
-            % get average time courses across ROI for each subject
-            % average across the runs, then average across voxels, results is a 120X#ofsubj matrix (mean for each time point) 
-            allTime(:,:,c,r) = cell2mat(arrayfun(@(x) double(nanmean(nanmean(roiData.(allConds{c})(x,r).rawData,3),2)),1:subCount(1),'uni',false)); 
-            aveTime(:,c,r) = nanmean(allTime(:,:,c,r),2);  % for each ROI (indexed by r), average across subject  
-
-            % recompute average cycle
-            for s=1:subCount(1)
-                tempTime = allTime(:,s,c,r);
-                if c<3 % if mofo or cont conditions 
-                    tempTime = [nan(2,1);tempTime;nan(10,1)]; % add 2 nans in the beginning, 10 in the end
-                    tempMean = nanmean(reshape(tempTime,size(tempTime,1)/(nCycles+1),nCycles+1),2); % take "fake cycle" into account
-                elseif c== 3 % if disp condition
-                    tempTime = [nan(8,1);tempTime;nan(4,1)]; % add 8 nans in the beginning, 4 in the end
-                    tempMean = nanmean(reshape(tempTime,size(tempTime,1)/(nCycles+1),nCycles+1),2); % take "fake cycle" into account
-                elseif ( c == 7 && ~benoitSubj(s) ) % if all disp, and my subjects
-                    tempTime = [nan(8,1);tempTime;nan(4,1)]; % add 8 nans in the beginning, 4 in the end
-                    tempMean = nanmean(reshape(tempTime,size(tempTime,1)/(nCycles+1),nCycles+1),2); % take "fake cycle" into account
-                else
-                    % benoit data have no mux, but are off by half a cycle
-                    tempTime = [nan(6,1);tempTime;nan(6,1)]; % add 12 nans in the beginning, 0 in the end
-                    tempMean = nanmean(reshape(tempTime,size(tempTime,1)/(nCycles+1),nCycles+1),2); % take "fake cycle" into account
-                end
-                roiData.(allConds{c})(s,r).meanCycle = tempMean - (max(tempMean)+min(tempMean))./2;
-            end
-
-            allMeanCycle(c,:,r) = nanmean(cat(2,roiData.(allConds{c})(:,r).meanCycle),2);
-            allStdevCycle(c,:,r) = nanstd(cat(2,roiData.(allConds{c})(:,r).meanCycle),0,2)/sqrt(numSubs(r,c));
-
-            % COMPUTE HARMONICS
-            nScans = size(roiData.(allConds{c})(1,1).rawData,1); % same for all ROIs and subjects
-            maxCycles = round(nScans/2);
-            xHarm= 1:maxCycles;
-            allMeanHarm(c,:,r) = nanmean(cat(2,roiData.(allConds{c})(:,r).harmonics));
-            allStdevHarm(c,:,r) = nanstd(cat(2,roiData.(allConds{c})(:,r).harmonics))/sqrt(numSubs(r,c));
-
-            % FIX SNR
-            if c==length(allConds) && whichSNR == 2 % if last condition and we are using across-condition noise floor
-            % generate new SNR value and replace old one
-                nHarm = length(roiData.cont(1,1).SNR); % number of harmonics in data
-                for s=1:subCount(1)
-                    if ~benoitSubj(s)
-                        curConds = [myConds,'alldisp'];
+                    if benoitSubj(s) 
+                        repData = roiData.C1vsC2(s,1); % replacement data, used for size
                     else
-                        curConds = [benoitConds,'alldisp'];
+                        repData = roiData.cont(s,1);
                     end
+                    if addNans
 
-                    for h=1:nHarm
-                        %make the two bands around the target cycle non-zero in order to calculate noise
-                        lst = false(size(roiData.cont(1,1).harmonics));
-                        lst([nCycles*h-1,nCycles*h-2,nCycles*h+1,nCycles*h+2])=true;                     
-                        % get sidebands from all conditions
-                        tempNoise = cell2mat(arrayfun(@(x) double(roiData.(curConds{x})(s,r).harmonics(lst)'),1:length(curConds),'uni',false));
-                        tempNoise = nanmean(nanmean(tempNoise)); % average over sidebands and conditions
+                        roiData.(allConds{c})(s,r).name = NaN;
+                        roiData.(allConds{c})(s,r).harmonics = NaN(size(repData.harmonics));
+                        roiData.(allConds{c})(s,r).meanCycle = NaN(size(repData.meanCycle));
+                        roiData.(allConds{c})(s,r).zScore = NaN(size(repData.zScore));
+                        roiData.(allConds{c})(s,r).SNR = NaN(size(repData.SNR));
+                        roiData.(allConds{c})(s,r).phase = NaN(size(repData.phase));
+                        roiData.(allConds{c})(s,r).rawData = NaN(size(repData.rawData,1),1,size(repData.rawData,3)); % since this is fake data, make number of voxels 1.
+                        roiData.(allConds{c})(s,r).realSignal = NaN(size(repData.realSignal));
+                        roiData.(allConds{c})(s,r).imagSignal = NaN(size(repData.imagSignal));
+                        roiData.(allConds{c})(s,r).realNoise = NaN(size(repData.realNoise));
+                        roiData.(allConds{c})(s,r).imagNoise = NaN(size(repData.imagNoise));
+                    else
+                    end
+                    % incoherent SNR field does not exist, so always add NaNs
+                    roiData.(allConds{c})(s,r).incohSNR = NaN(size(repData.SNR));
+                    clear repData;
+                end
 
-                        % compute noise values for incoherent SNR
-                        runMean = arrayfun(@(x) nanmean(roiData.(curConds{x})(s,r).rawData,3),1:length(curConds),'uni',false);
-                        fftComplex = cellfun(@(x) 2.*fft(x,[],1) ./ nTR,runMean,'uni',false);
-                        fftComplex = cellfun(@(x) x(2:maxCycles+1,:),fftComplex,'uni',false);
-                        tempNanIdx = cell2mat(cellfun(@(x) ~isnan(x(1,1)), fftComplex,'uni',false));
-                        % average the amplitude across side bands and conditions
-                        voxNoise = nanmean(cell2mat(cellfun(@(x) nanmean(abs(x(lst,:)),1),fftComplex(tempNanIdx),'uni',false)'),1);
+                % find those subjects whose sum(meanCycle) is not NAN
+                nanIdx{r,c} = cell2mat(arrayfun(@(x)~isnan(sum(x.meanCycle)),roiData.(allConds{c})(:,r),'uni',false )); 
+                numSubs(r,c) = length(find(nanIdx{r,c} == 1));
+                % concatenate each zScore by row, create a subjectXzScore matrix. (zScore is a 1x5 vector)
+                allZ{r}(:,:,c) = cat(2,roiData.(allConds{c})(:,r).zScore); 
+                % calculate the column mean of zScore matrix
+                allMeanZ(c,r,:)=nanmean(cat(2,roiData.(allConds{c})(:,r).zScore));
+                % and standard deviation
+                allStdevZ(c,r,:)=nanstd(cat(2,roiData.(allConds{c})(:,r).zScore))/sqrt(numSubs(r,c));
 
-                        for cCur=1:length(curConds)
-                            if ~isnan(roiData.(curConds{cCur})(s,r).SNR(1)) % if subject has data
-                                roiData.(curConds{cCur})(s,r).SNR(h,1) = roiData.(curConds{cCur})(s,r).harmonics(nCycles*h) / tempNoise;
-                                voxSNR = abs(fftComplex{cCur}(nCycles*h,:))./voxNoise;
-                                roiData.(curConds{cCur})(s,r).incohSNR(h,1) = nanmean(voxSNR,2);
-                            else
+                % COMPLEX
+                allRealSignal(:,:,c,r) = cat(2,roiData.(allConds{c})(:,r).realSignal)';
+                allImagSignal(:,:,c,r) = cat(2,roiData.(allConds{c})(:,r).imagSignal)';  
+                allRealNoise(:,:,c,r) = cat(2,roiData.(allConds{c})(:,r).realNoise)';
+                allImagNoise(:,:,c,r) = cat(2,roiData.(allConds{c})(:,r).imagNoise)';
+
+                % ADJUST PHASE phaseS
+                for n=1:2
+                    if n==1
+                        tempComplex = complex(allRealSignal(:,:,c,r),allImagSignal(:,:,c,r));
+                    else
+                        tempComplex = complex(allRealNoise(:,:,c,r),allImagNoise(:,:,c,r));
+                    end
+                    tempMag = abs(tempComplex);
+                    tempAngle = angle(tempComplex);
+                    if c>2 % if disp or Benoit data, rotate by pi (180 deg.)
+                        tempAngle = tempAngle+pi;     % condition 3 is 180 degrees out of phase
+                    else
+                    end
+                    if c<4 % phase angle adjusment due to mux, only on my data
+                        tempAngle = tempAngle-pi/3;                 % pi/3 radians = 60 degrees = 4 seconds (pre-TR 16, rather than 12, seconds)
+                    else
+                    end
+                    if c>6 % if combined disp data
+                        tempAngle(~benoitSubj,:) = tempAngle(~benoitSubj,:)-pi/3;
+                    else
+                    end
+                    tempAngle = phaseMod(tempAngle); % adjust to sine base
+                    tempComplex = tempMag.*exp(1i*tempAngle); % convert back to complex numbers
+                    if n==1
+                        allRealSignal(:,:,c,r) = real(tempComplex);
+                        allImagSignal(:,:,c,r) = imag(tempComplex);
+                    else
+                        allRealNoise(:,:,c,r) = real(tempComplex);
+                        allImagNoise(:,:,c,r) = imag(tempComplex);
+                    end
+                    clear temp*
+                end
+
+                % COMPUTE VECTOR MEAN AND ERRORS
+                if numSubs(r,c) > 1 % if at least two subjects have data
+                    tempVecErr = fitErrorEllipse([allRealSignal(nanIdx{r,c},whichHarm,c,r),allImagSignal(nanIdx{r,c},whichHarm,c,r)],'SEM',false);
+                    vecErrLow(c,r) = tempVecErr(1);
+                    vecErrHigh(c,r) = tempVecErr(2);
+                    meanComplex(c,r) = complex(mean(allRealSignal(nanIdx{r,c},whichHarm,c,r),1),mean(allImagSignal(nanIdx{r,c},whichHarm,c,r),1));
+                    vecMeanAmp(c,r) = abs(meanComplex(c,r));
+                    vecMeanPhase(c,r) = phase(meanComplex(c,r));
+                    if strcmp(roiList{r},'LO1') && c==7
+                        disp('LO1');
+                    else
+                    end
+                    tempResults = tSquaredFourierCoefs([allRealSignal(nanIdx{r,c},whichHarm,c,r),allImagSignal(nanIdx{r,c},whichHarm,c,r)]);
+                    vecMeanP(c,r) = tempResults.pVal;
+                    if vecMeanPhase(c,r)< 0 
+                        vecMeanPhase(c,r) = 2*pi+vecMeanPhase(c,r);
+                    else
+                    end
+                else
+                    vecErrLow(c,r) = NaN;
+                    vecErrHigh(c,r) = NaN;
+                    meanComplex(c,r) = NaN;
+                    vecMeanAmp(c,r) = NaN;
+                    vecMeanPhase(c,r) = NaN;
+                    vecMeanP(c,r) = NaN;
+                end
+
+                % COMPUTE MEAN CYCLE
+                % get average time courses across ROI for each subject
+                % average across the runs, then average across voxels, results is a 120X#ofsubj matrix (mean for each time point) 
+                allTime(:,:,c,r) = cell2mat(arrayfun(@(x) double(nanmean(nanmean(roiData.(allConds{c})(x,r).rawData,3),2)),1:subCount(1),'uni',false)); 
+                aveTime(:,c,r) = nanmean(allTime(:,:,c,r),2);  % for each ROI (indexed by r), average across subject  
+
+                % recompute average cycle
+                for s=1:subCount(1)
+                    tempTime = allTime(:,s,c,r);
+                    if c<3 % if mofo or cont conditions 
+                        tempTime = [nan(2,1);tempTime;nan(10,1)]; % add 2 nans in the beginning, 10 in the end
+                        tempMean = nanmean(reshape(tempTime,size(tempTime,1)/(nCycles+1),nCycles+1),2); % take "fake cycle" into account
+                    elseif c== 3 % if disp condition
+                        tempTime = [nan(8,1);tempTime;nan(4,1)]; % add 8 nans in the beginning, 4 in the end
+                        tempMean = nanmean(reshape(tempTime,size(tempTime,1)/(nCycles+1),nCycles+1),2); % take "fake cycle" into account
+                    elseif ( c == 7 && ~benoitSubj(s) ) % if all disp, and my subjects
+                        tempTime = [nan(8,1);tempTime;nan(4,1)]; % add 8 nans in the beginning, 4 in the end
+                        tempMean = nanmean(reshape(tempTime,size(tempTime,1)/(nCycles+1),nCycles+1),2); % take "fake cycle" into account
+                    else
+                        % benoit data have no mux, but are off by half a cycle
+                        tempTime = [nan(6,1);tempTime;nan(6,1)]; % add 12 nans in the beginning, 0 in the end
+                        tempMean = nanmean(reshape(tempTime,size(tempTime,1)/(nCycles+1),nCycles+1),2); % take "fake cycle" into account
+                    end
+                    roiData.(allConds{c})(s,r).meanCycle = tempMean - (max(tempMean)+min(tempMean))./2;
+                end
+
+                allMeanCycle(c,:,r) = nanmean(cat(2,roiData.(allConds{c})(:,r).meanCycle),2);
+                allStdevCycle(c,:,r) = nanstd(cat(2,roiData.(allConds{c})(:,r).meanCycle),0,2)/sqrt(numSubs(r,c));
+
+                % COMPUTE HARMONICS
+                nScans = size(roiData.(allConds{c})(1,1).rawData,1); % same for all ROIs and subjects
+                maxCycles = round(nScans/2);
+                xHarm= 1:maxCycles;
+                allMeanHarm(c,:,r) = nanmean(cat(2,roiData.(allConds{c})(:,r).harmonics),2);
+                allStdevHarm(c,:,r) = nanstd(cat(2,roiData.(allConds{c})(:,r).harmonics),0,2)/sqrt(numSubs(r,c));
+
+                % FIX SNR
+                if c==length(allConds) && whichSNR == 2 % if last condition and we are using across-condition noise floor
+                % generate new SNR value and replace old one
+                    nHarm = length(roiData.cont(1,1).SNR); % number of harmonics in data
+                    for s=1:subCount(1)
+                        if ~benoitSubj(s)
+                            curConds = [myConds,'alldisp'];
+                        else
+                            curConds = [benoitConds,'alldisp'];
+                        end
+
+                        for h=1:nHarm
+                            %make the two bands around the target cycle non-zero in order to calculate noise
+                            lst = false(size(roiData.cont(1,1).harmonics));
+                            lst([nCycles*h-1,nCycles*h-2,nCycles*h+1,nCycles*h+2])=true;                     
+                            % get sidebands from all conditions
+                            tempNoise = cell2mat(arrayfun(@(x) double(roiData.(curConds{x})(s,r).harmonics(lst)'),1:length(curConds),'uni',false));
+                            tempNoise = nanmean(nanmean(tempNoise)); % average over sidebands and conditions
+
+                            % compute noise values for incoherent SNR
+                            runMean = arrayfun(@(x) nanmean(roiData.(curConds{x})(s,r).rawData,3),1:length(curConds),'uni',false);
+                            fftComplex = cellfun(@(x) 2.*fft(x,[],1) ./ nTR,runMean,'uni',false);
+                            fftComplex = cellfun(@(x) x(2:maxCycles+1,:),fftComplex,'uni',false);
+                            tempNanIdx = cell2mat(cellfun(@(x) ~isnan(x(1,1)), fftComplex,'uni',false));
+                            % average the amplitude across side bands and conditions
+                            voxNoise = nanmean(cell2mat(cellfun(@(x) nanmean(abs(x(lst,:)),1),fftComplex(tempNanIdx),'uni',false)'),1);
+
+                            for cCur=1:length(curConds)
+                                if ~isnan(roiData.(curConds{cCur})(s,r).SNR(1)) % if subject has data
+                                    roiData.(curConds{cCur})(s,r).SNR(h,1) = roiData.(curConds{cCur})(s,r).harmonics(nCycles*h) / tempNoise;
+                                    voxSNR = abs(fftComplex{cCur}(nCycles*h,:))./voxNoise;
+                                    roiData.(curConds{cCur})(s,r).incohSNR(h,1) = nanmean(voxSNR,2);
+                                else
+                                end
                             end
                         end
                     end
+                else
                 end
-            else
+            end
+            % combine SNR values
+            for c = 1:length(allConds)
+                allSNR(:,:,c,r) = cat(2,roiData.(allConds{c})(:,r).SNR)';
+                allIncohSNR(:,:,c,r) = cat(2,roiData.(allConds{c})(:,r).incohSNR)';
             end
         end
-        % combine SNR values
-        for c = 1:length(allConds)
-            allSNR(:,:,c,r) = cat(2,roiData.(allConds{c})(:,r).SNR)';
-            allIncohSNR(:,:,c,r) = cat(2,roiData.(allConds{c})(:,r).incohSNR)';
-        end
+        save(savePath{4},'-v7.3');
+    else
+        disp('loading processed data, setting all run options to false');
+        curOpt = opt;
+        load(savePath{4})
+        opt = curOpt;
+        clear curOpt;
     end
-
 
     %% SET UP COLORS AND BASIC PLOTTING VARIABLES
     % condition colors
@@ -898,6 +909,7 @@ function script11_multifovea_ROIFFT(varargin)
     orderIdx(2,:) = cell2mat(cellfun(@(x) sum(strcmp(x,{'LO1' 'LO2' 'TO1' 'TO2' 'V3A' 'V3B'})),roiSelection,'uni',false))*3;
     orderIdx(3,:) = cell2mat(cellfun(@(x) sum(strcmp(x,{'IPS0' 'IPS1' 'IPS2' 'IPS3' 'IPS4','IPS5' 'SPL1' 'FEF'})),roiSelection,'uni',false))*4;
     orderIdx(4,:) = ~sum(orderIdx,1);
+    orderIdx(orderIdx>0) = orderIdx(orderIdx>0)-1; % take out early visual areas
     orderIdx = sum(orderIdx,1);
     missingIdx = roiAggregate(1,4).numSubs<8; % missing ROIs in Benoit subs
     expIdx{1} = orderIdx;
@@ -1001,7 +1013,7 @@ function script11_multifovea_ROIFFT(varargin)
         else
             figName = [figFolder,'/simplePlot_benoit'];
         end
-        %export_fig([figName,'.pdf'],'-pdf','-transparent',simpFig(p));
+        export_fig([figName,'.pdf'],'-pdf','-transparent',simpFig(p));
         hold off
     end
 
