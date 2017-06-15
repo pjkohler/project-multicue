@@ -1,74 +1,111 @@
 #!/bin/bash
 
+export doExp="1"
+export testMode="off"
+
 export CUR_DIR=${PWD}
-export TOP_DIR=/Volumes/Denali_MRI/kohler/fMRI_EXP/MULTIFOVEA
+if [ ${doExp} = "2" ]; then
+	echo "Running Experiment 2"
+	export TOP_DIR=/Volumes/Denali_4D2/kohler/fMRI_EXP/CS_DISP
+else
+	echo "Running Experiment 1"
+	export TOP_DIR=/Volumes/Denali_MRI/kohler/fMRI_EXP/MULTIFOVEA
+fi
 
 cd ${TOP_DIR}
+SUBFOLDERS=(`ls -d 201*`)
 
-SUBFOLDERS=(`ls -d *nl-0040*`)
-echo ${SUBFOLDERS[@]}
+export FS_DIR=/Volumes/svndl/anatomy/FREESURFER_SUBS
+export ALT_FS=/Volumes/svndl/anatomy/__OLD_DATA/FREESURFER_SUBS
 
 export SUFFIX='vr.sc.dt'
 
 for FULL_DIR in ${SUBFOLDERS[@]}
 do
-	cd ${TOP_DIR}
 	[ -d "${FULL_DIR}" ] || continue
 	cd ${FULL_DIR}
 	SUB=${FULL_DIR##*_}
+
+	echo ${FULL_DIR}
+
+	# TAKE CARE OF IMPROPERLY NAMED SUBJECT
 	if [ "${SUB}" = "nl-0033" ]
 		then
 		export SUB='skeri0003'
 	fi
 
-	# DO CONT
-	export CONTOUT=(`ls -f *run*cont*.niml.dset`)
-	if [ -z ${CONTOUT} ]
-		then
-		pkVOL2SURF -mf ave -sv ${SUB}_fs4_SurfVol_Alnd_Exp+orig. -s ${SUB} -std run*cont*.nii.gz
-	fi
-	export CONTSMOOTHOUT=(`ls -f *run*cont*3fwhm*.niml.dset`)
-	if [ -z ${CONTSMOOTHOUT} ]
-		then
-		export CONTFILES=(`ls -f *run*cont*.nii.gz`)
-		pkSURFSMOOTH -bs 3 -s ${SUB} -std ${CONTFILES[@]%%.nii.gz}
+	# USE ALTERNATE DIRECTORY FOR EXP2 SUBS, IF THEY ARE NOT IN STANDARD DIR
+	if [ -d ${FS_DIR}/${SUB}_fs4 ]
+	then
+		export SUBJECTS_DIR=${FS_DIR}
+	else
+		export SUBJECTS_DIR=${ALT_FS}
 	fi
 
-	# DO MOFO
-	export MOFOOUT=(`ls -f *run*mofo*.niml.dset`)
-	if [ -z ${MOFOOUT} ]
-		then
-		pkVOL2SURF -mf ave -sv ${SUB}_fs4_SurfVol_Alnd_Exp+orig. -s ${SUB} -std run*mofo*.nii.gz
+	# MAKE TARGET DIRECTORIES, IF WE THEY DO NOT ALREADY EXIST
+	if [ ! -d "${TOP_DIR}/${FULL_DIR}/SURF" ]; then
+		mkdir ${TOP_DIR}/${FULL_DIR}/SURF
 	fi
-	export MOFOSMOOTHOUT=(`ls -f *run*mofo*3fwhm*.niml.dset`)
-	if [ -z ${MOFOSMOOTHOUT} ]
-		then
-		export MOFOFILES=(`ls -f run*mofo*.nii.gz`)
-		pkSURFSMOOTH -bs 3 -s ${SUB} -std ${MOFOFILES[@]%%.nii.gz}
-	fi
-
-	export DISPFILES=(`ls -f run*disp*.nii.gz`)
-	if [ ! -z ${DISPFILES} ]
-		then
-		export DISPOUT=(`ls -f *run*disp*.niml.dset`)
-		if [ -z ${DISPOUT} ]
-		then
-			pkVOL2SURF -mf ave -sv ${SUB}_fs4_SurfVol_Alnd_Exp+orig. -s ${SUB} -std run*disp*.nii.gz
+	if [ ! -d "${TOP_DIR}/${FULL_DIR}/SURF/run_surf" ]; then
+		mkdir ${TOP_DIR}/${FULL_DIR}/SURF/run_surf
+	fi	
+	if [ ${doExp} = "2" ]; then
+		declare -a condNames=("C1vsC2" "C2vsC3" "C1vsC3")
+	else
+		if [ "${SUB}" = "skeri0004" ] || [ "${SUB}" = "nl-0022" ]; then
+			declare -a condNames=("cont" "mofo")
+		else
+			declare -a condNames=("cont" "mofo" "disp")
 		fi
-		export DISPSMOOTHOUT=(`ls -f *run*disp*3fwhm*.niml.dset`)
-		if [ -z ${DISPSMOOTHOUT} ]
+	fi
+	# NOW DO IT, FIRST MASK
+	export MASKOUT=(`ls -f ${TOP_DIR}/${FULL_DIR}/SURF/run_surf/*${SUB}_mask.niml.dset`)
+	# check if output exists
+	if [ -z ${MASKOUT} ]
+		then
+		if [ $testMode = "off" ]; then
+			3dcopy ${TOP_DIR}/${FULL_DIR}/ROIs/${SUB}_mask.nii.gz ${SUB}_mask.nii.gz
+			mriVol2Surf.py --mapfunc mode --std141 --surfvol ${SUB}_fs4_SurfVol_Alnd_Exp+orig. ${SUB} ${SUB}_mask.nii.gz
+			# now move files
+			mv *${SUB}_mask.niml.dset ${TOP_DIR}/${FULL_DIR}/SURF/run_surf/.
+			rm ${SUB}_mask.nii.gz
+		else
+			echo "test mode: would run mriVol2Surf.py on ${SUB} mask"
+		fi 
+	fi
+
+	# ... THEN DATA
+	for exp in "${condNames[@]}"
+	do
+		export OUT=(`ls -f ${TOP_DIR}/${FULL_DIR}/SURF/run_surf/*run*${exp}*.niml.dset`)
+		# check if output exists
+		if [ -z ${OUT} ]
 			then
-			pkSURFSMOOTH -bs 3 -s ${SUB} -std ${DISPFILES[@]%%.nii.gz}
+			if [ $testMode = "off" ]; then
+				mriVol2Surf.py --mapfunc ave --std141 --surfvol ${SUB}_fs4_SurfVol_Alnd_Exp+orig. ${SUB} run*${exp}*.nii.gz
+				# now move files
+				mv *run*niml.dset* ${TOP_DIR}/${FULL_DIR}/SURF/run_surf/.
+			else
+				echo "test mode: would run mriVol2Surf.py on ${SUB} condition $exp"
+			fi 
 		fi
-	fi
-
-	# now move files
-	if [ ! -d "${FULL_DIR}/SURF" ]; then
-		mkdir ${FULL_DIR}/SURF
-	fi
-	if [ ! -d "${FULL_DIR}/SURF/run_surf" ]; then
-		mkdir ${FULL_DIR}/SURF
-	fi
-	mv *run*niml.dset* ${FULL_DIR}/SURF/run_surf/.
-
+		export SMOOTHOUT=(`ls -f ${TOP_DIR}/${FULL_DIR}/SURF/run_surf/*run*${exp}*3fwhm*.niml.dset`)
+		# check if output exists
+		if [ -z ${SMOOTHOUT} ]
+			then	
+			if [ $testMode = "off" ]; then
+				# SURFSMOOTH REQUIRES THAT YOU ARE IN SAME FOLDER AS FILES
+				cd ${TOP_DIR}/${FULL_DIR}/SURF/run_surf
+				export SURF_FILES=(`ls -f *run*${exp}*.niml.dset`)
+				mriSurfSmooth.py --blursize 3 --std141 ${SUB} ${SURF_FILES[@]}
+				cd ${TOP_DIR}/${FULL_DIR}
+			else
+				echo "test mode: would run mriSurfSmooth.py on ${SUB} condition $exp"
+			fi
+		fi
+	done
+	
+    cd ${TOP_DIR}
 done
+# return to current directory
+cd ${CUR_DIR}
