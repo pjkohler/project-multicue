@@ -1,4 +1,4 @@
-function script11_multifovea_ROIFFT(varargin)
+function [tableExp1,tableExp2] = script11_multifovea_ROIFFT(varargin)
     % Description:	main function for analysis of multicue daata
     % 
     % Syntax:	multifovea_ROIFFT(<options>)
@@ -1182,18 +1182,18 @@ function script11_multifovea_ROIFFT(varargin)
     yUnit = [.5,.2,.1,.1,.1,.1];
     sigPos = yMax-(yMax-yMin)*.05;
     numConds = length(condNames)-1;
-    for r=1:length(evcROIs)
-        for c=1:numConds
-             if c==1
-                figure(1);
-                figName = [figFolder,'/foveaROI'];
-                plotCount = 0;
-             elseif c==4
-                figure(2);
-                figName = [figFolder,'/foveaROI_benoit'];
-                plotCount = 0;
-             end
-            plotCount = plotCount+1;
+    for c=1:numConds
+        if c==1
+            figure(1);
+            figName = [figFolder,'/foveaROI'];
+            plotCount = 0;
+         elseif c==4
+            figure(2);
+            figName = [figFolder,'/foveaROI_benoit'];
+            plotCount = 0;
+        end
+        plotCount = plotCount+1;
+        for r=1:length(evcROIs)   
             subplot(3,length(evcROIs),r+(plotCount-1)*length(evcROIs));
             roiToPlot = find(~isnan(foveaVecMean(:,c,r)));
             hold on;
@@ -1233,18 +1233,22 @@ function script11_multifovea_ROIFFT(varargin)
             xlim([.5,3.5]);
             hold off
         end
+        if c==3 || c==6 || c==7
+            figWidth=[length(evcROIs)*6,12];
+            set(gcf, 'units', 'centimeters'); % make figure size units centimeters
+            oldPos = get(gcf, 'pos');
+            newPos = oldPos;
+            newPos(3) = figWidth(1);
+            newPos(4) = figWidth(2);
+            set(gcf, 'pos',newPos);
+            export_fig([figName,'.pdf'],'-pdf','-transparent',gcf);
+        else
+        end
     end
-    figWidth=[length(evcROIs)*6,12];
-    set(gcf, 'units', 'centimeters'); % make figure size units centimeters
-    oldPos = get(gcf, 'pos');
-    newPos = oldPos;
-    newPos(3) = figWidth(1);
-    newPos(4) = figWidth(2);
-    set(gcf, 'pos',newPos);
-    export_fig([figName,'.pdf'],'-pdf','-transparent',gcf);
+    
 end
 
-function outCell = makeTableStr(inStruct,hemi);
+function outCell = makeTableStr(inStruct,hemi)
     if nargin < 2
         hemi = 1;
     else
