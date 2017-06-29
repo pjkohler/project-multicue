@@ -1,19 +1,46 @@
-function roiReport = script04_prepareAtlasROIs(doExp)
-    if nargin < 1
-        doExp = 2;
-    else
-    end
-    
-    if nargin < 2
-        doKGS = false;
-    else
-    end
+function roiReport = script04_prepareAtlasROIs(varargin)    
+    % Description:	main function for analysis of multicue daata
+    % 
+    % Syntax:	script04_prepareAtlasROIs(<options>)
+    % <options>
+    %   doExp    - scalar indication whether to run Exp. 1 or [2]
+    %    
+    %   doKGS    - logical indicating whether to include KGS ROIs
+    %                   (true), or not([false])
+    %
+    %   saveROIs - logical indicating whether to save the ROIs (true)
+    %                   or just run diagnostics ([false])
+    %
+    %   hemiOverlap - logical indicating whether to 
+    %                 allow L/R overlap ([true]) or not (false)
+    %
+    %   doMask - logical indicating whether to 
+    %                 create new mask ([true]) or not (false)
+    %
+    %   clipFrac    - scalar indicating the clipping fraction for 3dAutoMask [0.4]   
 
-    if doExp == 2
+    %% ADD PATHS   
+    codeFolder = '/Users/kohler/code';
+    addpath(genpath([codeFolder,'/git/schlegel/matlab_lib']));
+    addpath(genpath([codeFolder,'/git/mrC']));
+    addpath(genpath([codeFolder,'/git/MRI/matlab']))
+    setenv('DYLD_LIBRARY_PATH','')
+    
+    %% RUN FUNCTION
+    opt	= ParseArgs(varargin,...
+            'doExp', 1, ...
+            'doKGS', false, ...
+            'saveROIs', true, ...
+            'hemiOverlap', true, ...
+            'clipFrac',0.5, ...
+            'doMask',true ...
+            );
+    
+    if opt.doExp == 2
         disp('running Experiment 2 (collected by B. Cottereau)');
         topFolder = '/Volumes/Denali_4D2/kohler/fMRI_EXP/CS_DISP';
         subjFolders = subfolders([topFolder,'/2012*'],1);
-    elseif doExp == 1
+    elseif opt.doExp == 1
         disp('running Experiment 1 (collected by P.J. Kohler)');
         topFolder = '/Volumes/Denali_MRI/kohler/fMRI_EXP/MULTIFOVEA';
         subjFolders = subfolders([topFolder,'/201*'],1);
@@ -22,7 +49,7 @@ function roiReport = script04_prepareAtlasROIs(doExp)
     end
     
     atlasName{1}='wangatlas';
-    if doKGS
+    if opt.doKGS
         disp('including KGS ROIs');
         atlasName{2}='KGSatlas';
         roiNames{2} = {'IOG' 'OTS' 'mFUS' 'pFUS' 'PPA' 'VWFA1' 'VWFA2'}; % KGS ROIs, in order
@@ -39,7 +66,13 @@ function roiReport = script04_prepareAtlasROIs(doExp)
         else
             subName = 'skeri0003';
         end
-
+        if opt.doMask
+            rmCall = sprintf('rm %s/ROIs/%s_mask.nii.gz',subjFolders{s},subName);
+            maskCall = sprintf('3dAutomask -prefix %s/ROIs/%s_mask.nii.gz -clfrac %.1f %s/ref_epi.ts.do.vr.nii.gz',subjFolders{s},subName,opt.clipFrac,subjFolders{s});
+            system(join({rmCall,maskCall},';'));
+        else
+        end
+        
         for a=1:length(atlasName)
             % determine how much is lost in the masking
             nii = NIfTI.Read([subjFolders{s},'/ROIs/rh.',atlasName{a},'_rs.nii.gz']);
@@ -62,16 +95,22 @@ function roiReport = script04_prepareAtlasROIs(doExp)
                 percVox(z,2) = 1-((length(find(rightData==z))-numVox(z,2))./length(find(rightData==z)));
                 percVox(isnan(percVox)) = 0;
                 %percVox(percVox>1) = 1;
+                roiReport.numOutside{a}(z,s) = ( length(find(leftData==z))-numVox(z,1) ) + ( length(find(rightData==z))-numVox(z,2) );
                 if mean(percVox(z,:),2)>(3/4) && sum(numVox(z,:),2)>30 % if less than 25% was loss across both ROIs                
-                    finalROIs(maskData==1 & leftData==z) = z;
-                    finalROIs(maskData==1 & rightData==z) = z+length(roiNames{a});
+                    finalROIs( maskData==1 & leftData==z ) = z;
+                    finalROIs( maskData==1 & rightData==z ) = z+length(roiNames{a});
+                    if ~opt.hemiOverlap
+                        % take out L/R overlap
+                        finalROIs( maskData==1 & rightData==z & leftData==z ) = 0;
+                    else
+                    end
                     roiReport.included{a}(z,s) = 1;
+                    roiReport.hemiOverlap{a}(z,s) =  length( find ( maskData==1 & rightData==z & leftData==z ) ); 
                 else
                     roiReport.included{a}(z,s) = 0;
+                    roiReport.hemiOverlap{a}(z,s) = NaN;
                 end
             end
-            finalROIs(find(leftData >0 & rightData>0)) = 0; % take out L/R overlap
-            overlap(s,a) = length(find(leftData >0 & rightData>0));
             if a==1
                 wangROIs = finalROIs;
             else
@@ -79,13 +118,16 @@ function roiReport = script04_prepareAtlasROIs(doExp)
                 kgsROIs(kgsROIs>0) = kgsROIs(kgsROIs>0)+length(roiNames{1}); % add 50 to KGS rois
             end
             % save individual sets
-            finalNii.data = finalROIs;
-            outputName = [subjFolders{s},'/ROIs/',subName,'_',atlasName{a},'_al_mask.nii.gz'];
-            if exist(outputName,'file')
-                delete(outputName)
+            if opt.saveROIs 
+                finalNii.data = finalROIs;
+                outputName = [subjFolders{s},'/ROIs/',subName,'_',atlasName{a},'_al_mask.nii.gz'];
+                if exist(outputName,'file')
+                    delete(outputName)
+                else
+                end
+                NIfTI.Write(finalNii,outputName);
             else
             end
-            NIfTI.Write(finalNii,outputName);
             clear left*
             clear right*
             roiReport.num{a}(:,s) = sum(numVox,2);
