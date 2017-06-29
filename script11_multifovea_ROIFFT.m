@@ -52,11 +52,6 @@ function [tableExp1,tableExp2] = script11_multifovea_ROIFFT(varargin)
     
     
     if opt.processData
-        poolobj = gcp('nocreate'); % If no pool, do not create new one.
-        if isempty(poolobj)
-            poolobj = parpool;
-        else
-        end
         
         nCycles = 10;
         nHarm = 5;
@@ -71,35 +66,34 @@ function [tableExp1,tableExp2] = script11_multifovea_ROIFFT(varargin)
         wangROIs = {'V1v' 'V1d' 'V2v' 'V2d' 'V3v' 'V3d' 'hV4' 'VO1' 'VO2' 'PHC1' 'PHC2' ...
             'TO2' 'TO1' 'LO2' 'LO1' 'V3B' 'V3A' 'IPS0' 'IPS1' 'IPS2' 'IPS3' 'IPS4' ...
             'IPS5' 'SPL1' 'FEF'}; % Wang ROIs, in order
-        
-        numROIs = (length(includeROIs)+4)*3; % add 4 for d/v V1-V3, and then multiply by 3 to get L, R and BL
-        
+
         myConds = {'cont','mofo','disp'};
         benoitConds = {'C2vsC3','C1vsC3','C1vsC2'};
-        allConds = [myConds,benoitConds];
-       
+
         if opt.runFull
             roiFiles = '*wangatlas_al_mask.nii.gz';
             roiLabel = [cellfun(@(x) [x,'-L'],wangROIs,'uni',false),cellfun(@(x) [x,'-R'],wangROIs,'uni',false)];
-            
-            for c = 1:length(allConds)
-                curCond = allConds{c};
-                disp(['Running condition ',curCond,' ...']);
-                for s=1:subCount(1)
-                    curROI = subfiles([subjFolders{s},'/ROIs/',roiFiles],1);
-                    curFiles = subfiles([subjFolders{s},'/run*',curCond,'*',suffix,'.nii.gz'],1);
+            for s=1:subCount(1)
+                curROI = subfiles([subjFolders{s},'/ROIs/',roiFiles],1);
+                disp(['Reading ',subjFolders{s},' ...']);
+                if ~benoitSubj(s)
+                    curConds = myConds;
+                else
+                    curConds = benoitConds;
+                end
+                curROI = subfiles([subjFolders{s},'/ROIs/',roiFiles],1);
+                for c = 1:length(curConds)
+                    curFiles = subfiles([subjFolders{s},'/run*',curConds{c},'*',suffix,'.nii.gz'],1);
                     if curFiles{1}
-                        outData(s,:) = mriRoiFFT(curFiles,curROI,roiLabel,nCycles,includeROIs);
+                        [roiData.(curConds{c})(s,:)] = mriRoiFFT(curFiles,curROI,roiLabel,nCycles,includeROIs);
                     else
                     end
                 end
-                roiData.(curCond) = outData;
             end
             save(savePath{1},'roiData','-v7.3');
         else
             load(savePath{1},'roiData')
         end
-        delete(poolobj);
 
         %% RING ROIS
         if opt.runRing
