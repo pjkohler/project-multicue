@@ -876,6 +876,7 @@ function [tableExp1,tableExp2] = script11_multifovea_ROIFFT(varargin)
     end
     
     %% MAKE TABLES
+    % full roi data
     missingIdx = roiAggregate(1,4).numSubs<8; % missing ROIs in Benoit subs
     % main roi data
     tableData = makeTableStr(roiAggregate);
@@ -892,8 +893,23 @@ function [tableExp1,tableExp2] = script11_multifovea_ROIFFT(varargin)
         tableData(~missingIdx(4:end),:,4),tableData(~missingIdx(4:end),:,5),tableData(~missingIdx(4:end),:,6),...
         'RowNames',roiLabels{2},'VariableNames',{'Exp2',condNames{4},'AbsoluteAnti','AbsoluteIn'});
     
-    condNames(ismember(condNames,'absolute')) = {'absolute-only'};
-    condNames(ismember(condNames,'relative')) = {'relative-only'};
+    condNames(ismember(condNames,'absolute')) = {'uniform control'};
+    condNames(ismember(condNames,'relative')) = {'segmented vs uniform'};
+    condNames(ismember(condNames,'abs + rel')) = {'segmented control'};
+    
+    % ring data
+    ringLabels = arrayfun(@(x) num2str(x,'%3.2f'), ringList,'uni',false)';  
+    ringSigIdx = ( ringVecP<0.05 ) + ( ringVecP<0.01 ) + ( ringVecP<0.001 );
+    ringSigSymbol = arrayfun(@(x) sigSymbols(x), ringSigIdx,'uni',false);
+    
+    for c = 1:6
+        ringTableData(:,1,:) = arrayfun(@(x) num2str(x,'%3.4f'), ringVecP(:,c,:),'uni',false);
+        ringTableData(:,2,:) = arrayfun(@(x) num2str(x,'%3.4f'), ringSign(:,c,:),'uni',false);
+        ringTableData(:,3,:) = ringSigSymbol(:,c,:);
+        
+        ringTable{c} = table(ringTableData(:,:,1),ringTableData(:,:,2),ringTableData(:,:,3),...
+            'RowNames',ringLabels,'VariableNames',{'V1','V2','V3'});
+    end
     
     %% SIMPLER PLOT
     close all;
@@ -1116,7 +1132,7 @@ function [tableExp1,tableExp2] = script11_multifovea_ROIFFT(varargin)
             if r==numRingPlots && plotCount == 3
                 lH = legend(ringH(:,numRingPlots),condNames(c-2:c),'location','northeast');
                 lPosRing = get(lH, 'position');
-                lPosRing(1) = lPosRing(1)+lPosRing(3)*0.5;
+                lPosRing(1) = lPosRing(1)+lPosRing(3)*0.4;
                 lPosRing(2) = lPosRing(2)+lPosRing(4)*.75;
                 set(lH, 'position',lPosRing);
             elseif r==1
