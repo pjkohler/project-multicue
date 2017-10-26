@@ -755,24 +755,24 @@ function [tableExp1,tableExp2] = script11_multifovea_ROIFFT(varargin)
     clear ring*; 
     pCutOff = 0.05;
     evcROIs = {'V1','V2','V3'};
-    ringList = unique(cellfun(@(x) x(7:end),roiList,'uni',false));
-    ringList = ringList(cellfun(@(x) ~isempty(strfind(x,'-')), ringList));
-    for r = 1:length(ringList);
-        ringSNR(:,:,:,r)=cell2mat(cellfun(@(x) allSNR(:,whichHarm,:,ismember(roiList,[x,'ring',ringList{r}])),evcROIs,'uni',false));
+    ringRoiList = unique(cellfun(@(x) x(7:end),roiList,'uni',false));
+    ringRoiList = ringRoiList(cellfun(@(x) ~isempty(strfind(x,'-')), ringRoiList));
+    for r = 1:length(ringRoiList);
+        ringSNR(:,:,:,r)=cell2mat(cellfun(@(x) allSNR(:,whichHarm,:,ismember(roiList,[x,'ring',ringRoiList{r}])),evcROIs,'uni',false));
         % ringSNR dimensions are subj x ROI x condition x ring
-        ringReal(:,:,:,r)=cell2mat(cellfun(@(x) allRealSignal(:,whichHarm,:,ismember(roiList,[x,'ring',ringList{r}])),evcROIs,'uni',false));
-        ringImag(:,:,:,r)=cell2mat(cellfun(@(x) allImagSignal(:,whichHarm,:,ismember(roiList,[x,'ring',ringList{r}])),evcROIs,'uni',false));
+        ringReal(:,:,:,r)=cell2mat(cellfun(@(x) allRealSignal(:,whichHarm,:,ismember(roiList,[x,'ring',ringRoiList{r}])),evcROIs,'uni',false));
+        ringImag(:,:,:,r)=cell2mat(cellfun(@(x) allImagSignal(:,whichHarm,:,ismember(roiList,[x,'ring',ringRoiList{r}])),evcROIs,'uni',false));
 
-        ringVecMean(r,:,:)=cell2mat(cellfun(@(x) vecMeanAmp(:,ismember(roiList,[x,'ring',ringList{r}])),evcROIs,'uni',false));
-        ringVecPhase(r,:,:) = cell2mat(cellfun(@(x) vecMeanPhase(:,ismember(roiList,[x,'ring',ringList{r}])),evcROIs,'uni',false));
-        ringVecHigh(r,:,:) = cell2mat(cellfun(@(x) vecErrHigh(:,ismember(roiList,[x,'ring',ringList{r}])),evcROIs,'uni',false));
-        ringVecLow(r,:,:) = cell2mat(cellfun(@(x) vecErrLow(:,ismember(roiList,[x,'ring',ringList{r}])),evcROIs,'uni',false));
-        ringVecP(r,:,:) = cell2mat(cellfun(@(x) vecMeanP(:,ismember(roiList,[x,'ring',ringList{r}])),evcROIs,'uni',false));
-        ringComplex(r,:,:) = cell2mat(cellfun(@(x) meanComplex(:,ismember(roiList,[x,'ring',ringList{r}])),evcROIs,'uni',false));
+        ringVecMean(r,:,:)=cell2mat(cellfun(@(x) vecMeanAmp(:,ismember(roiList,[x,'ring',ringRoiList{r}])),evcROIs,'uni',false));
+        ringVecPhase(r,:,:) = cell2mat(cellfun(@(x) vecMeanPhase(:,ismember(roiList,[x,'ring',ringRoiList{r}])),evcROIs,'uni',false));
+        ringVecHigh(r,:,:) = cell2mat(cellfun(@(x) vecErrHigh(:,ismember(roiList,[x,'ring',ringRoiList{r}])),evcROIs,'uni',false));
+        ringVecLow(r,:,:) = cell2mat(cellfun(@(x) vecErrLow(:,ismember(roiList,[x,'ring',ringRoiList{r}])),evcROIs,'uni',false));
+        ringVecP(r,:,:) = cell2mat(cellfun(@(x) vecMeanP(:,ismember(roiList,[x,'ring',ringRoiList{r}])),evcROIs,'uni',false));
+        ringComplex(r,:,:) = cell2mat(cellfun(@(x) meanComplex(:,ismember(roiList,[x,'ring',ringRoiList{r}])),evcROIs,'uni',false));
 
-        tempCycleMean = cellfun(@(x) allMeanCycle(:,:,ismember(roiList,[x,'ring',ringList{r}])),evcROIs,'uni',false);
+        tempCycleMean = cellfun(@(x) allMeanCycle(:,:,ismember(roiList,[x,'ring',ringRoiList{r}])),evcROIs,'uni',false);
         ringCycleMean(:,:,:,r) = reshape(cell2mat(tempCycleMean),length(condNames),12,length(evcROIs));
-        tempCycleErr = cellfun(@(x) allStdevCycle(:,:,ismember(roiList,[x,'ring',ringList{r}])),evcROIs,'uni',false);
+        tempCycleErr = cellfun(@(x) allStdevCycle(:,:,ismember(roiList,[x,'ring',ringRoiList{r}])),evcROIs,'uni',false);
         ringCycleErr(:,:,:,r) = reshape(cell2mat(tempCycleErr),length(condNames),12,length(evcROIs));
         for z=1:length(evcROIs)
             ringNum(r,:,z) = sum(~isnan(ringSNR(:,z,:,r)));
@@ -897,7 +897,18 @@ function [tableExp1,tableExp2] = script11_multifovea_ROIFFT(varargin)
     condNames(ismember(condNames,'relative')) = {'segmented vs uniform'};
     condNames(ismember(condNames,'abs + rel')) = {'segmented control'};
     
-    % ring data
+    % compute ring values
+    ringSet = find(cell2mat(cellfun(@(x) ~isempty(strfind(x,'V1ring')),roiList,'uni',false)));
+    loVal = roiList{ringSet(1)}(7:strfind(roiList{ringSet(1)},'-')-1);
+    hiVal = roiList{ringSet(1)}(strfind(roiList{ringSet(1)},'-')+1:end);
+    hiVal2 = roiList{ringSet(2)}(strfind(roiList{ringSet(2)},'-')+1:end);
+    % assign values
+    ringSize = str2double(hiVal)-str2double(loVal); 
+    ringIncr = str2double(hiVal2)-str2double(hiVal);
+    ringMax = str2double(roiList{ringSet(end)}(strfind(roiList{ringSet(end)},'-')+1:end));
+    ringList = (ringSize/2):ringIncr:(ringMax-ringSize/2);
+    
+    % ring data table
     ringLabels = arrayfun(@(x) num2str(x,'%3.2f'), ringList,'uni',false)';  
     ringSigIdx = ( ringVecP<0.05 ) + ( ringVecP<0.01 ) + ( ringVecP<0.001 );
     ringSigSymbol = arrayfun(@(x) sigSymbols(x), ringSigIdx,'uni',false);
@@ -920,6 +931,7 @@ function [tableExp1,tableExp2] = script11_multifovea_ROIFFT(varargin)
     plotEarlyVisual = false;    % plot early visual areas 
     plotSNRsig = false;          % plot SNR-based significance
     pCutOff = 0.05;             % cut off for significance
+    plotOne = true;              % plot only condition 1, in Experiment 2
     
     % work out ordering
     orderIdx(1,:) = ismember(roiSelection,{'hV4' 'VO1' 'VO2' 'PHC1' 'PHC2'}) * 2; % second group
@@ -941,6 +953,12 @@ function [tableExp1,tableExp2] = script11_multifovea_ROIFFT(varargin)
     for p = 1:2
         simpFig(p) = figure;
         condIdx = (1:length(myConds))+3.*(p-1);
+        if p == 2 && plotOne
+            condIdx = condIdx(1);
+            offSet = [-barWidth/2 , -barWidth/2 , -barWidth/2];
+        elseif p == 1
+            condIdx = condIdx(2:3);
+        end
         splitPoints = find(diff(expIdx{p}(expIdx{p}>0)));
         splitPoints = splitPoints + arrayfun(@(x) x*.5 +.25, 1:length(splitPoints));
         xAxis = 0; xTicks =[]; xOrder=[]; yMax = 0.6; yMin=-0.1; yUnit = 0.1;
@@ -972,10 +990,10 @@ function [tableExp1,tableExp2] = script11_multifovea_ROIFFT(varargin)
                         if plotSign
                             plotVals = roiAggregate(1,condIdx(c)).Vec.ampMean(expIdx{p}==z).* roiAggregate(1,condIdx(c)).Vec.sign(expIdx{p}==z);
                             if p == 1
-                                yMax = 0.3; yMin=-0.4; yUnit = 0.1;
+                                yMax = 0.3; yMin=-0.1; yUnit = 0.1;
                                 legLoc = 'southeast';
                             else
-                                yMax = 0.15; yMin=-0.05; yUnit = 0.05;
+                                yMax = 0.3; yMin=-0.1; yUnit = 0.1;
                                 legLoc = 'northeast';
                             end
                         else
@@ -1019,9 +1037,14 @@ function [tableExp1,tableExp2] = script11_multifovea_ROIFFT(varargin)
 
                     ylim([yMin,yMax]);
                     fakeSpot = plot(max(xTicks),yMin+yUnit,'w','Visible','off'); % put a white dot behind the legend
-                    
-                    legend([pH.bar(z,:),fakeSpot],[condNames(condIdx),sprintf('N = %d', max(numSubs(:, condIdx(1))))],...
-                        'location',legLoc,'edgecolor',[1 1 1],'fontsize',12,'fontname','Helvetica');                    
+                    if plotOne && p == 2
+                        legend([pH.bar(z,:),fakeSpot],[{'disparity'},sprintf('(N = %d)', max(numSubs(:, condIdx(1))))],...
+                            'location',legLoc,'edgecolor',[1 1 1],'fontsize',fontSize,'fontname','Helvetica');
+                    else
+                        
+                        lH = legend(pH.bar(z,:),arrayfun(@(x) sprintf('%s (N = %d)', condNames{x},max(numSubs(:, x))),condIdx,'uni',false),...
+                            'location',legLoc,'edgecolor',[1 1 1],'fontsize',fontSize,'fontname','Helvetica');
+                    end
                     labelH = rotateXLabels(gca,0);
                     labelColors = roiColors(expIdx{p}>0,:);
                     arrayfun(@(x) set(labelH(x),'Color',labelColors(x,:),'fontweight','bold','fontsize',14), 1:length(labelColors),'uni',false);
@@ -1049,7 +1072,11 @@ function [tableExp1,tableExp2] = script11_multifovea_ROIFFT(varargin)
         if p ==1
             figName = [figFolder,'/simplePlot'];
         else
-            figName = [figFolder,'/simplePlot_benoit'];
+            if plotOne
+                figName = [figFolder,'/simplePlot_benoit_one'];
+            else
+                figName = [figFolder,'/simplePlot_benoit'];
+            end
         end
         export_fig([figName,'.pdf'],'-pdf','-transparent',simpFig(p));
         hold off
@@ -1059,17 +1086,6 @@ function [tableExp1,tableExp2] = script11_multifovea_ROIFFT(varargin)
     %% MAKE RING PLOT
     close all
     plotFits = false;
-
-    % compute ring values
-    ringSet = find(cell2mat(cellfun(@(x) ~isempty(strfind(x,'V1ring')),roiList,'uni',false)));
-    loVal = roiList{ringSet(1)}(7:strfind(roiList{ringSet(1)},'-')-1);
-    hiVal = roiList{ringSet(1)}(strfind(roiList{ringSet(1)},'-')+1:end);
-    hiVal2 = roiList{ringSet(2)}(strfind(roiList{ringSet(2)},'-')+1:end);
-    % assign values
-    ringSize = str2double(hiVal)-str2double(loVal); 
-    ringIncr = str2double(hiVal2)-str2double(hiVal);
-    ringMax = str2double(roiList{ringSet(end)}(strfind(roiList{ringSet(end)},'-')+1:end));
-    ringList = (ringSize/2):ringIncr:(ringMax-ringSize/2);
     figure;
     subFigLabel = {'A','B','C','D'};
     lStyle = {'o','sq'};
@@ -1096,9 +1112,15 @@ function [tableExp1,tableExp2] = script11_multifovea_ROIFFT(varargin)
                 plotCount = 0;
             else
             end
-            yMax = 0.6;
-            yMin = -0.4;
-            yUnit = 0.2;
+            if ~plotOne
+                yMax = 0.6;
+                yMin = -0.4;
+                yUnit = 0.2;
+            else
+                yMax = 0.4;
+                yMin = -0.4;
+                yUnit = 0.2;
+            end
         end
         sigPos = yMin+(yMax-yMin)*.05;
         plotCount = plotCount+1;
@@ -1129,23 +1151,45 @@ function [tableExp1,tableExp2] = script11_multifovea_ROIFFT(varargin)
             %tempH = plot(ringList,curSig*sigPos,'o', 'color',condColors(c,:),'linewidth',10);
             set(gca,'xtick',0:1:7,'ytick',yMin:yUnit:yMax,gcaOpts{:},'ticklength',[.025,.025]); 
             ylim([yMin,yMax]); xlim([xMin,xMax]);
-            if r==numRingPlots && plotCount == 3
-                lH = legend(ringH(:,numRingPlots),condNames(c-2:c),'location','northeast');
-                lPosRing = get(lH, 'position');
-                lPosRing(1) = lPosRing(1)+lPosRing(3)*0.4;
-                lPosRing(2) = lPosRing(2)+lPosRing(4)*.75;
-                set(lH, 'position',lPosRing);
-            elseif r==1
-                text(-1,yMax*1.3,subFigLabel{plotCount},'fontsize',24,'fontname','Helvetica');
+            if ~plotOne || c ~= 4
+                if r==numRingPlots && plotCount == 3
+                    condIdx = c-2:c;
+                    
+                    lH = legend(ringH(:,numRingPlots),...,
+                        arrayfun(@(x) sprintf('%s (N = %d)', condNames{x},max(numSubs(:, x))),condIdx,'uni',false),...
+                        'location','northeast');
+                    lPosRing = get(lH, 'position');
+                    lPosRing(1) = lPosRing(1)+lPosRing(3)*0.4;
+                    lPosRing(2) = lPosRing(2)+lPosRing(4)*.75;
+                    set(lH, 'position',lPosRing);
+                elseif r==1
+                    text(-1,yMax*1.3,subFigLabel{plotCount},'fontsize',fontSize*2,'fontname','Helvetica');
+                else
+                end
+                if r==1 && plotCount==2
+                   ylabel('Signed Vector Average Amplitude','fontsize',fontSize,'fontname','Helvetica'); 
+                elseif r==2 && plotCount==3
+                   xlabel('Eccentricity at Ring Center (º/vis. angle)','fontsize',fontSize,'fontname','Helvetica'); 
+                else
+                end
             else
+                if r==numRingPlots 
+                    lH = legend(ringH(1,numRingPlots),'disparity (N = 10)','location','northeast');
+                    lPosRing = get(lH, 'position');
+                    lPosRing(1) = lPosRing(1)+lPosRing(3)*0.4;
+                    lPosRing(2) = lPosRing(2)+lPosRing(4)*.75;
+                    set(lH, 'position',lPosRing);
+                else
+                end
+                if r==1 && plotCount==1
+                   tempLabelH(1) = ylabel('Signed Vector Average Amplitude','fontsize',fontSize,'fontname','Helvetica'); 
+                elseif r==2 && plotCount==1
+                   tempLabelH(2) = xlabel('Eccentricity at Ring Center (º/vis. angle)','fontsize',fontSize,'fontname','Helvetica'); 
+                else
+                end
             end
             text(.25,yMax*1.1,evcROIs{r},'fontsize',18,'fontname','Helvetica','fontweight','bold','color',roiColors(r,:));
-            if r==1 && plotCount==2
-               ylabel('Signed Vector Average Amplitude','fontsize',18,'fontname','Helvetica'); 
-            elseif r==2 && plotCount==3
-               xlabel('Eccentricity at Ring Center (º/vis. angle)','fontsize',18,'fontname','Helvetica'); 
-            else
-            end
+            
             hold off
             if plotFits 
                 % fit plots
@@ -1176,7 +1220,20 @@ function [tableExp1,tableExp2] = script11_multifovea_ROIFFT(varargin)
                 figWidth=[24,18];
             end
         end
-        if c==3 || c==6 || c==7
+        if plotOne && c == 4
+            set(gcf, 'units', 'centimeters'); % make figure size units centimeters
+            oldPos = get(gcf, 'pos');
+            newPos = oldPos;
+            newPos(3) = figWidth(1);
+            newPos(4) = figWidth(2);
+            set(gcf, 'pos',newPos);
+            export_fig([figName,'_one.pdf'],'-pdf','-transparent',gcf);
+            hold off
+            delete tempLabelH;
+        else
+        end
+            
+        if c==3 || ( c==6 || c==7 && ~plotOne)
             
             set(gcf, 'units', 'centimeters'); % make figure size units centimeters
             oldPos = get(gcf, 'pos');
