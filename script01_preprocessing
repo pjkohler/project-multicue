@@ -1,24 +1,25 @@
 #!/bin/bash
 
-expFolder=/Volumes/Denali_MRI/kohler/fMRI_EXP/MULTIFOVEA/
+codeFolder=${PWD}
+expFolder=/Volumes/Denali_MRI/kohler/fMRI_EXP/MULTIFOVEA_ATT/
 
 
 
 cd ${expFolder}
 
 
-for sub in 20160808_nl-0040
+for sub in 201*
 	do
 		cd ${sub}/raw_data
 
 		fileList=($(ls | grep -e 'run.*_1.nii.gz' | grep -v 'inplane' | grep -v 'unwarp'))
 		refEpi=${fileList[${#fileList[@]}-1]}
 		refName=${refEpi%%.nii.gz}
-		pkPre -ref ${refName}.nii.gz -tr 2 -pre_tr 2 -tfile ${expFolder}/sliceTiming/mux2_2secs_60total_timing ${fileList[@]}
-		pkVOLREG -ref ${refName}.ts.do.nii.gz run*ts.do.nii.gz
-		pkScale run*vr.nii.gz
+		mriPre.py --ref ${refName}.nii.gz --trdur 2 --pre_tr 6 --tfile ${expFolder}/sliceTiming/mux2_2secs_60total_timing ${fileList[@]}
+		mriVolreg.py --ref ${refName}.ts.do.nii.gz run*ts.do.nii.gz
+		mriScale.py run*vr.nii.gz
 		3dcopy ${refName}.ts.do.vr.nii.gz ../refEpi.ts.do.vr.nii.gz
 		mv run*ts.do.vr.sc.dt.nii.gz ../.
 	done
 	
-cd ${expFolder}
+cd ${codeFolder}
