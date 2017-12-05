@@ -1,10 +1,15 @@
 #!/bin/bash
 
-export doExp="1"
+export doExp="3"
 export testMode="off"
+export SUFFIX='vr.sc.dt'
 
 export CUR_DIR=${PWD}
-if [ ${doExp} = "2" ]; then
+if [ ${doExp} = "3" ]; then
+	echo "Running Experiment 3"
+	export SUFFIX='vr.sc.dt_al'
+	export TOP_DIR=/Volumes/Denali_MRI/kohler/fMRI_EXP/MULTIFOVEA_ATT
+elif [ ${doExp} = "2" ]; then
 	echo "Running Experiment 2"
 	export TOP_DIR=/Volumes/Denali_4D2/kohler/fMRI_EXP/CS_DISP
 else
@@ -17,8 +22,6 @@ SUBFOLDERS=(`ls -d 201*`)
 
 export FS_DIR=/Volumes/svndl/anatomy/FREESURFER_SUBS
 export ALT_FS=/Volumes/svndl/anatomy/__OLD_DATA/FREESURFER_SUBS
-
-export SUFFIX='vr.sc.dt'
 
 for FULL_DIR in ${SUBFOLDERS[@]}
 do
@@ -49,7 +52,9 @@ do
 	if [ ! -d "${TOP_DIR}/${FULL_DIR}/SURF/run_surf" ]; then
 		mkdir ${TOP_DIR}/${FULL_DIR}/SURF/run_surf
 	fi	
-	if [ ${doExp} = "2" ]; then
+	if [ ${doExp} = "3" ]; then
+		declare -a condNames=("motAtt" "dispAtt")
+	elif [ ${doExp} = "2" ]; then
 		declare -a condNames=("C1vsC2" "C2vsC3" "C1vsC3")
 	else
 		if [ "${SUB}" = "skeri0004" ] || [ "${SUB}" = "nl-0022" ]; then
@@ -59,13 +64,21 @@ do
 		fi
 	fi
 	# NOW DO IT, FIRST MASK
+	refEpi=(`ls -f ${TOP_DIR}/${FULL_DIR}/refEpi.*al+orig.HEAD`)
+	echo ${refEpi%.HEAD}
 	export MASKOUT=(`ls -f ${TOP_DIR}/${FULL_DIR}/SURF/run_surf/*${SUB}_mask.niml.dset`)
 	# check if output exists
 	if [ -z ${MASKOUT} ]
 		then
 		if [ $testMode = "off" ]; then
-			3dcopy ${TOP_DIR}/${FULL_DIR}/ROIs/${SUB}_mask.nii.gz ${SUB}_mask.nii.gz
-			mriVol2Surf.py --mapfunc mode --std141 --surfvol ${SUB}_fs4_SurfVol_Alnd_Exp+orig. ${SUB} ${SUB}_mask.nii.gz
+			if [ ${doExp} = "3" ]; then
+				
+				3dAutomask -prefix ${SUB}_mask.nii.gz ${refEpi%.HEAD}
+				3dcopy refAnat+orig ${SUB}_fs4_SurfVol_Alnd_Exp+orig
+			else
+				3dcopy ${TOP_DIR}/${FULL_DIR}/ROIs/${SUB}_mask.nii.gz ${SUB}_mask.nii.gz
+			fi
+			mriVol2Surf.py ${SUB} ${SUB}_mask.nii.gz --mapfunc mode --std141 --surfvol ${SUB}_fs4_SurfVol_Alnd_Exp+orig.
 			# now move files
 			mv *${SUB}_mask.niml.dset ${TOP_DIR}/${FULL_DIR}/SURF/run_surf/.
 			rm ${SUB}_mask.nii.gz
@@ -82,7 +95,7 @@ do
 		if [ -z ${OUT} ]
 			then
 			if [ $testMode = "off" ]; then
-				mriVol2Surf.py --mapfunc ave --std141 --surfvol ${SUB}_fs4_SurfVol_Alnd_Exp+orig. ${SUB} run*${exp}*.nii.gz
+				mriVol2Surf.py ${SUB} run*${exp}*${SUFFIX}.nii.gz --mapfunc ave --std141 --surfvol ${SUB}_fs4_SurfVol_Alnd_Exp+orig.
 				# now move files
 				mv *run*niml.dset* ${TOP_DIR}/${FULL_DIR}/SURF/run_surf/.
 			else
@@ -96,7 +109,7 @@ do
 			if [ $testMode = "off" ]; then
 				# SURFSMOOTH REQUIRES THAT YOU ARE IN SAME FOLDER AS FILES
 				cd ${TOP_DIR}/${FULL_DIR}/SURF/run_surf
-				export SURF_FILES=(`ls -f *run*${exp}*.niml.dset`)
+				export SURF_FILES=(`ls -f *run*${exp}*${SUFFIX}.niml.dset`)
 				mriSurfSmooth.py --blursize 3 --std141 ${SUB} ${SURF_FILES[@]}
 				cd ${TOP_DIR}/${FULL_DIR}
 			else
