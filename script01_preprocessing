@@ -23,3 +23,10 @@ for sub in 201*
 	done
 	
 cd ${codeFolder}
+
+# afterwards, align EPIs to anatomical from the other experiment
+# 3dcopy ../../MULTIFOVEA/20160301_nl-0039/nl-0039_fs4_SurfVol_Alnd_Exp+orig. refAnat+orig
+#align_epi_anat.py -anat refAnat+orig -epi refEpi.ts.do.vr.nii.gz \
+#	-epi_base 5 -anat_has_skull no -epi2anat -epi_strip 3dSkullStrip \
+#	-rigid_body -volreg off -tshift off -ginormous_move -rigid_body -child_epi run0*
+#for run in run*ts.do.vr.sc.dt.nii.gz; do 3dAFNItoNIFTI -prefix ${run%.nii.gz}_al.nii.gz ${run%.nii.gz}_al+orig; rm ${run%.nii.gz}_al+orig*; done 
