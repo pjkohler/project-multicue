@@ -71,10 +71,8 @@ do
 	if [ -z ${MASKOUT} ]
 		then
 		if [ $testMode = "off" ]; then
-			if [ ${doExp} = "3" ]; then
-				
+			if [ ${doExp} = "3" ]; then				
 				3dAutomask -prefix ${SUB}_mask.nii.gz ${refEpi%.HEAD}
-				3dcopy refAnat+orig ${SUB}_fs4_SurfVol_Alnd_Exp+orig
 			else
 				3dcopy ${TOP_DIR}/${FULL_DIR}/ROIs/${SUB}_mask.nii.gz ${SUB}_mask.nii.gz
 			fi
