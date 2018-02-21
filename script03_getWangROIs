@@ -7,7 +7,7 @@ export SUBJECTS_DIR=/Volumes/svndl/anatomy/FREESURFER_SUBS
 
 cd ${EXP_FOLDER}
 
-for SUBJ in $(ls -d *nl-0040* )
+for SUBJ in $(ls -d *nl-0027* )
 do
 
 	if  [ $SUBJ = "20150506_nl-0033" ];then
@@ -33,7 +33,7 @@ do
 							-exp_anat ${EXP_FOLDER}/${SUBJ}/${refAnat}+orig. -prefix ${EXP_FOLDER}/${SUBJ}/${subname}_fs4_SurfVol_Alnd_Exp+orig. -strip_skull surf_anat
 	fi
 
-	#create a mask
+	# make directory and copy reference epi and anatomy
 	if [ ! -d ${EXP_FOLDER}/${SUBJ}/ROIs ]
 		then
 		mkdir ${EXP_FOLDER}/${SUBJ}/ROIs
@@ -47,35 +47,31 @@ do
 	fi
 	
 	3dcopy ../${refAnat}+orig .
-	cp ../refEpi* .
-
-	rm ${EXP_FOLDER}/${SUBJ}/ROIs/${subname}_mask.nii.gz
-	3dAutomask -prefix ${EXP_FOLDER}/${SUBJ}/ROIs/${subname}_mask.nii.gz ${EXP_FOLDER}/${SUBJ}/refEpi.ts.do.vr.nii.gz
+	cp ../ref_epi* .
 
 	#clean up 
-
 	for hemi in rh lh
 		do
 			# WANG
-			cd ${SUBJECTS_DIR}/${subname}_fs4/WangAtlas
-			rm ${EXP_FOLDER}/${SUBJ}/ROIs/${hemi}.wangatlas*
-			pkSURF2VOL -s ${subname} \
-					   -o ${EXP_FOLDER}/${SUBJ}/ROIs \
-					   -sv ${EXP_FOLDER}/${SUBJ}/${subname}_fs4_SurfVol_Alnd_Exp+orig \
-					   -mf mode ${hemi}.wangatlas_ready.niml.dset
+			cd ${SUBJECTS_DIR}/${subname}_fs4/wang_atlas
+			rm ${EXP_FOLDER}/${SUBJ}/ROIs/${hemi}.wang_atlas*
+			mriSurf2Vol.py ${subname} ${hemi}.wang_atlas_cluster.niml.dset \
+					   --outdir ${EXP_FOLDER}/${SUBJ}/ROIs \
+					   --surfvol ${EXP_FOLDER}/${SUBJ}/${subname}_fs4_SurfVol_Alnd_Exp+orig \
+					   --mapfunc mode 
 			
 			# BENSON
-			cd ${SUBJECTS_DIR}/${subname}_fs4/bensonModel
+			cd ${SUBJECTS_DIR}/${subname}_fs4/benson_atlas
 			rm ${EXP_FOLDER}/${SUBJ}/ROIs/${hemi}.eccen.V1-V3model*
-			pkSURF2VOL -s ${subname} \
-					   -o ${EXP_FOLDER}/${SUBJ}/ROIs \
-					   -sv ${EXP_FOLDER}/${SUBJ}/${subname}_fs4_SurfVol_Alnd_Exp+orig \
-					   -mf ave ${hemi}.eccen.V1-V3model.niml.dset
+			mriSurf2Vol.py ${subname} ${hemi}.all.benson_atlas.niml.dset \
+					   --outdir ${EXP_FOLDER}/${SUBJ}/ROIs \
+					   --surfvol ${EXP_FOLDER}/${SUBJ}/${subname}_fs4_SurfVol_Alnd_Exp+orig \
+					   --mapfunc ave 
 
 			cd ${EXP_FOLDER}/${SUBJ}/ROIs
 
-			3dresample -master ${EXP_FOLDER}/${SUBJ}/refEpi.ts.do.vr.nii.gz -prefix ${hemi}.wangatlas_rs.nii.gz -inset ${hemi}.wangatlas_ready+orig
-			3dresample -master ${EXP_FOLDER}/${SUBJ}/refEpi.ts.do.vr.nii.gz -prefix ${hemi}.eccen.V1-V3model_rs.nii.gz -inset ${hemi}.eccen.V1-V3model+orig
+			3dresample -master ${EXP_FOLDER}/${SUBJ}/ref_epi.ts.do.vr.nii.gz -prefix ${hemi}.wangatlas_rs.nii.gz -inset ${hemi}.wang_atlas_cluster.nii.gz
+			3dresample -master ${EXP_FOLDER}/${SUBJ}/ref_epi.ts.do.vr.nii.gz -prefix ${hemi}.eccen.V1-V3model_rs.nii.gz -inset ${hemi}.all.benson_atlas.nii.gz[1]
 			
 			if [ ${hemi} = lh ]; then
 				rm ${subname}_eccen.V1-V3model_al_mask.nii*
