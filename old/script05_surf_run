@@ -18,7 +18,7 @@ else
 fi
 
 cd ${TOP_DIR}
-SUBFOLDERS=(`ls -d 201*`)
+SUBFOLDERS=(`ls -d 20171208*`)
 
 export FS_DIR=/Volumes/svndl/anatomy/FREESURFER_SUBS
 export ALT_FS=/Volumes/svndl/anatomy/__OLD_DATA/FREESURFER_SUBS
